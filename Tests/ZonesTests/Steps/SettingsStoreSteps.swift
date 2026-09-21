@@ -64,6 +64,26 @@ final class SettingsStoreSteps {
             self.settings.update { $0.zoneGap = existing }
         }
 
+        registry.when("I set the zone gap to -(\\d+)") { args in
+            self.settings.update { $0.zoneGap = -Double(args[0])! }
+        }
+
+        registry.when("I set the overlay opacity to (\\d+)") { args in
+            self.settings.update { $0.overlayOpacity = Double(args[0])! }
+        }
+
+        registry.when("I set the overlay padding to -(\\d+)") { args in
+            self.settings.update { $0.outerPadding = -Double(args[0])! }
+        }
+
+        registry.then("the overlay opacity is (\\d+)") { args in
+            XCTAssertEqual(self.settings.current.overlayOpacity, Double(args[0])!)
+        }
+
+        registry.then("exactly (\\d+) settingsDidChange notification was posted") { args in
+            XCTAssertEqual(self.notificationCount, Int(args[0])!)
+        }
+
         registry.then("the stored settings JSON contains a zone gap of (\\d+)") { args in
             let stored = self.storedSettings
             XCTAssertNotNil(stored, "nothing was persisted")

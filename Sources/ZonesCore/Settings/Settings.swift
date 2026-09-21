@@ -38,8 +38,12 @@ public final class Settings {
     public var current: AppSettings {
         get { value }
         set {
-            guard newValue != value else { return }
-            value = newValue
+            // Normalize before the comparison, so assigning an out-of-range
+            // value that normalizes back to the current one is correctly a
+            // no-op rather than a spurious broadcast.
+            let normalized = newValue.normalized()
+            guard normalized != value else { return }
+            value = normalized
             persist()
             notificationCenter.post(name: .settingsDidChange, object: nil)
         }
