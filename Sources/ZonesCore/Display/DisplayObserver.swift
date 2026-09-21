@@ -20,7 +20,8 @@ public final class DisplayObserver {
     /// How long the configuration must be quiet before it counts as settled.
     public static let settleInterval: TimeInterval = 0.5
 
-    private let notificationCenter: NotificationCenter
+    /// Exposed so observers register on the center this instance posts to.
+    public let notificationCenter: NotificationCenter
     private let sourceCenter: NotificationCenter
     private let settleInterval: TimeInterval
     private var observer: NSObjectProtocol?

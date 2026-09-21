@@ -30,6 +30,12 @@ public enum ZoneResolver {
     /// `area` must be the screen's **visibleFrame**, never its `frame`:
     /// visibleFrame excludes the menu bar and the Dock, and resolving against
     /// `frame` puts zones underneath both.
+    /// `Zone.rect` is normalized **top-left origin, Y down** (CoreGraphics).
+    /// `area` is an AppKit rect — **bottom-left origin, Y up** — because it
+    /// comes from `NSScreen.visibleFrame`. The Y axis is therefore flipped
+    /// here. Mapping `zone.rect.minY` straight onto `area.minY` puts the top
+    /// row of a layout along the bottom of the display, which looks plausible
+    /// on a symmetric layout and is wrong on every other one.
     public static func resolve(_ zone: Zone, in area: CGRect,
                                spacing: ZoneSpacing = .none) -> CGRect {
         let padded = area.insetBy(dx: spacing.outerPadding, dy: spacing.outerPadding)
@@ -38,33 +44,36 @@ public enum ZoneResolver {
 
         let raw = CGRect(
             x: padded.minX + zone.rect.minX * padded.width,
-            y: padded.minY + zone.rect.minY * padded.height,
+            // Flip: the zone's bottom edge (normalized maxY) is the smallest
+            // AppKit y it occupies.
+            y: padded.maxY - zone.rect.maxY * padded.height,
             width: zone.rect.width * padded.width,
             height: zone.rect.height * padded.height
         )
-        return applyGap(to: raw, zone: zone, within: padded, gap: spacing.gap)
+        return applyGap(to: raw, zone: zone, gap: spacing.gap)
     }
 
     /// Inset each edge that abuts another zone by half the gap.
     ///
     /// Only internal edges: insetting the outer edges too would double the
-    /// padding the user asked for at the display's boundary.
-    private static func applyGap(to rect: CGRect, zone: Zone,
-                                 within bounds: CGRect, gap: Double) -> CGRect {
+    /// padding the user asked for at the display's boundary. The vertical
+    /// insets are named for what the *user* sees, which after the Y flip means
+    /// the zone's normalized top edge moves the rect's `maxY`.
+    private static func applyGap(to rect: CGRect, zone: Zone, gap: Double) -> CGRect {
         guard gap > 0 else { return rect }
         let half = gap / 2
         let epsilon = 0.0001
 
         let insetLeft = zone.rect.minX > epsilon ? half : 0
         let insetRight = zone.rect.maxX < 1 - epsilon ? half : 0
-        let insetTop = zone.rect.minY > epsilon ? half : 0
-        let insetBottom = zone.rect.maxY < 1 - epsilon ? half : 0
+        let insetAbove = zone.rect.minY > epsilon ? half : 0
+        let insetBelow = zone.rect.maxY < 1 - epsilon ? half : 0
 
         let result = CGRect(
             x: rect.minX + insetLeft,
-            y: rect.minY + insetTop,
+            y: rect.minY + insetBelow,
             width: rect.width - insetLeft - insetRight,
-            height: rect.height - insetTop - insetBottom
+            height: rect.height - insetAbove - insetBelow
         )
         // Never hand back an inverted rect for a zone narrower than the gap.
         guard result.width > 0, result.height > 0 else { return .zero }

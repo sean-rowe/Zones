@@ -31,4 +31,17 @@ Feature: Layout persistence
   Scenario: An archive from a newer version is left alone
     Given a layout store whose archive claims a future version
     Then the store has no layouts
+    And the store is read only
     And the store did not crash
+
+  Scenario: A newer archive is never overwritten by built-in layouts
+    Given a layout store whose archive claims a future version
+    When I install the built-in layouts
+    Then the store has no layouts
+    And the stored bytes still claim the future version
+
+  Scenario: Corrupt storage is replaceable, unlike a newer archive
+    Given a layout store backed by corrupt storage
+    When I install the built-in layouts
+    Then the store has some layouts
+    And the store is not read only

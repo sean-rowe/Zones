@@ -73,6 +73,32 @@ final class LayoutPersistenceSteps {
             XCTAssertNil(self.store.assignedLayout(for: self.display))
         }
 
+        registry.when("I install the built-in layouts") { _ in
+            self.store.installBuiltInsIfEmpty()
+        }
+
+        registry.then("the store is read only") { _ in
+            XCTAssertTrue(self.store.isReadOnlyDueToNewerArchive)
+        }
+
+        registry.then("the store is not read only") { _ in
+            XCTAssertFalse(self.store.isReadOnlyDueToNewerArchive)
+        }
+
+        registry.then("the store has some layouts") { _ in
+            XCTAssertFalse(self.store.layouts.isEmpty)
+        }
+
+        registry.then("the stored bytes still claim the future version") { _ in
+            guard let data = self.storage.data(forKey: LayoutStore.storageKey) else {
+                return XCTFail("the newer archive must not have been deleted")
+            }
+            let object = try? JSONSerialization.jsonObject(with: data)
+            let json = object as? [String: Any]
+            XCTAssertEqual(json?["version"] as? Int, 9999,
+                           "the newer archive must be left byte-for-byte alone")
+        }
+
         registry.then("the store has no layouts") { _ in
             XCTAssertTrue(self.store.layouts.isEmpty)
         }
