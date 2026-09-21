@@ -28,8 +28,8 @@ final class SettingsStoreSteps {
         center = NotificationCenter()
         notificationCount = 0
         settings = Settings(storage: storage, notificationCenter: center)
-        observer = center.addObserver(forName: .settingsDidChange, object: nil, queue: nil) { _ in
-            self.notificationCount += 1
+        observer = center.addObserver(forName: .settingsDidChange, object: nil, queue: nil) { [weak self] _ in
+            self?.notificationCount += 1
         }
     }
 
@@ -49,7 +49,9 @@ final class SettingsStoreSteps {
         }
 
         registry.given("a settings store whose stored JSON has an unknown key") { _ in
-            let json = #"{"zoneGap": 8, "somethingFromTheFuture": {"nested": true}}"#
+            // zoneGap must differ from the default (8), or "the known key
+            // survived" is indistinguishable from "everything fell back".
+            let json = #"{"zoneGap": 21, "somethingFromTheFuture": {"nested": true}}"#
             self.makeStore(seed: [Settings.storageKey: Data(json.utf8)])
         }
 
@@ -78,6 +80,16 @@ final class SettingsStoreSteps {
 
         registry.then("the settings equal the defaults") { _ in
             XCTAssertEqual(self.settings.current, AppSettings())
+        }
+
+        registry.then("the zone gap is (\\d+)") { args in
+            XCTAssertEqual(self.settings.current.zoneGap, Double(args[0])!)
+        }
+
+        registry.then("the other settings equal the defaults") { _ in
+            var expected = AppSettings()
+            expected.zoneGap = self.settings.current.zoneGap
+            XCTAssertEqual(self.settings.current, expected)
         }
 
         registry.then("the store did not crash") { _ in

@@ -60,6 +60,9 @@ public enum MoveToApplications {
         alert.addButton(withTitle: "Move to Applications")
         alert.addButton(withTitle: "Not Now")
 
+        // Zones runs as an accessory, so it is not frontmost by default and an
+        // alert can open behind whatever the user is looking at.
+        NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else {
             ZonesLog.info("Zones", "user declined the move to /Applications")
             return false
@@ -123,6 +126,7 @@ public enum MoveToApplications {
         let alert = NSAlert()
         alert.messageText = message
         alert.informativeText = detail
+        NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
     }
 }

@@ -1,0 +1,19 @@
+# CodeRabbit runs SwiftLint with opt-in rules enabled. Two of those fight the
+# way this codebase is written, so they are turned off here deliberately
+# rather than worked around at each site.
+disabled_rules:
+  # Would have every class carry an empty `deinit` purely to satisfy the rule.
+  - required_deinit
+
+opt_in_rules:
+  - empty_count
+  - force_unwrapping
+  - redundant_nil_coalescing
+
+excluded:
+  - .build
+
+# Test step definitions read as prose and run long by design.
+type_body_length:
+  warning: 400
+  error: 600

@@ -34,6 +34,33 @@ final class HarnessFailureModeTests: XCTestCase {
         XCTAssertTrue(ran)
     }
 
+    func testProseInsideAScenarioIsReportedNotSkipped() {
+        // A mistyped keyword must not vanish. "Give" is not a step keyword, so
+        // it has to come back as an unrecognised line rather than leaving the
+        // scenario one step shorter and still green.
+        let feature = FeatureParser.parse("""
+        Feature: F
+          Scenario: S
+            Given one
+            Give two
+            Then three
+        """)
+        XCTAssertEqual(feature.unrecognisedLines, ["Give two"])
+        XCTAssertEqual(feature.scenarios.first?.steps.count, 2)
+    }
+
+    func testFeatureDescriptionAboveScenariosIsNotFlagged() {
+        let feature = FeatureParser.parse("""
+        Feature: F
+          Some prose describing the feature.
+          Spanning two lines.
+
+          Scenario: S
+            Given one
+        """)
+        XCTAssertTrue(feature.unrecognisedLines.isEmpty)
+    }
+
     func testAndContinuesPrecedingKeyword() {
         let feature = FeatureParser.parse("""
         Feature: F

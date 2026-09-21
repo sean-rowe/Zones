@@ -24,7 +24,8 @@ public final class ZonesController {
         // startup, the user must have a way to reach the app.
         installStatusItem()
 
-        NotificationCenter.default.addObserver(
+        // Observe the center the permission actually posts on, not `.default`.
+        permission.notificationCenter.addObserver(
             self,
             selector: #selector(accessibilityTrustDidChange),
             name: .accessibilityTrustDidChange,
@@ -40,7 +41,11 @@ public final class ZonesController {
     }
 
     private func resolvePermission() {
-        onboarding = nil
+        // Released on the next run loop turn: this runs from the onboarding
+        // window's own windowWillClose, and dropping the last reference to a
+        // controller in the middle of its delegate callback is a use-after-free
+        // waiting to happen.
+        DispatchQueue.main.async { [weak self] in self?.onboarding = nil }
         if permission.isTrusted {
             activateWindowManagement()
         } else {

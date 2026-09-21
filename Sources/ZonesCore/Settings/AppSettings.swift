@@ -70,9 +70,12 @@ public struct AppSettings: Codable, Equatable, Sendable {
         }
         activationModifier = value(.activationModifier, defaults.activationModifier)
         spanModifier = value(.spanModifier, defaults.spanModifier)
-        zoneGap = value(.zoneGap, defaults.zoneGap)
-        outerPadding = value(.outerPadding, defaults.outerPadding)
-        overlayOpacity = value(.overlayOpacity, defaults.overlayOpacity)
+        // Clamped, not just defaulted: these come from a file a user can edit,
+        // and a negative gap or an opacity above 1 would reach geometry and
+        // drawing code as a silently wrong value rather than an obvious one.
+        zoneGap = max(0, value(.zoneGap, defaults.zoneGap))
+        outerPadding = max(0, value(.outerPadding, defaults.outerPadding))
+        overlayOpacity = min(1, max(0, value(.overlayOpacity, defaults.overlayOpacity)))
         snapOnAppLaunch = value(.snapOnAppLaunch, defaults.snapOnAppLaunch)
         restoreOnDisplayChange = value(.restoreOnDisplayChange, defaults.restoreOnDisplayChange)
         flashZonesOnLayoutSwitch = value(.flashZonesOnLayoutSwitch, defaults.flashZonesOnLayoutSwitch)

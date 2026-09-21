@@ -14,7 +14,8 @@ Feature: Settings store
 
   Scenario: Unknown keys from a future version are ignored
     Given a settings store whose stored JSON has an unknown key
-    Then the settings equal the defaults
+    Then the zone gap is 21
+    And the other settings equal the defaults
     And the store did not crash
 
   Scenario: Setting a value it already holds does not broadcast

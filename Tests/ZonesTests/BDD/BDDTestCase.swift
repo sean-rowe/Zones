@@ -11,12 +11,6 @@ class BDDTestCase: XCTestCase {
     /// Override to register step definitions for this feature.
     func registerSteps() {}
 
-    override func setUp() {
-        super.setUp()
-        registry = StepRegistry()
-        registerSteps()
-    }
-
     func runFeature(_ name: String, file: StaticString = #filePath, line: UInt = #line) {
         guard let url = Bundle.module.url(forResource: name, withExtension: "feature",
                                           subdirectory: "Features")
@@ -33,6 +27,10 @@ class BDDTestCase: XCTestCase {
         XCTAssertFalse(feature.scenarios.isEmpty,
                        "feature '\(name)' parsed to zero scenarios",
                        file: file, line: line)
+        for unrecognised in feature.unrecognisedLines {
+            XCTFail("unrecognised line in \(name).feature: \(unrecognised)",
+                    file: file, line: line)
+        }
 
         for scenario in feature.scenarios {
             // Fresh state per scenario, exactly as a real Gherkin runner does.
