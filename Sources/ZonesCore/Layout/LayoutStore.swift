@@ -14,6 +14,18 @@ struct LayoutArchive: Codable {
     var assignments: [String: UUID] = [:]
 }
 
+/// Just the version field, decoded on its own.
+///
+/// The version has to be read *before* the rest of the archive, because a
+/// newer Zones may have changed the schema in ways this version cannot decode.
+/// Decoding the whole archive first and checking the version afterwards means
+/// a schema change throws, lands in the error path, and is treated as
+/// corruption — which is writable, and overwrites the very data the version
+/// check exists to protect.
+private struct LayoutArchiveVersion: Codable {
+    var version: Int
+}
+
 /// Owns the user's layouts and which display each one is assigned to.
 public final class LayoutStore {
     public static let shared = LayoutStore()
@@ -47,6 +59,7 @@ public final class LayoutStore {
 
     /// Insert or replace by identity.
     public func save(_ layout: ZoneLayout) {
+        guard !isReadOnlyDueToNewerArchive else { return }
         if let index = archive.layouts.firstIndex(where: { $0.id == layout.id }) {
             archive.layouts[index] = layout
         } else {
@@ -60,6 +73,7 @@ public final class LayoutStore {
     /// Assignments are cleaned up here rather than left dangling, so a deleted
     /// layout cannot leave a display pointing at nothing.
     public func delete(id: UUID) {
+        guard !isReadOnlyDueToNewerArchive else { return }
         archive.layouts.removeAll { $0.id == id }
         archive.assignments = archive.assignments.filter { $0.value != id }
         persist()
@@ -68,6 +82,7 @@ public final class LayoutStore {
     // MARK: - Assignment
 
     public func assign(layoutID: UUID, to display: DisplayIdentity) {
+        guard !isReadOnlyDueToNewerArchive else { return }
         archive.assignments[display.key] = layoutID
         persist()
     }
@@ -79,6 +94,7 @@ public final class LayoutStore {
     }
 
     public func clearAssignment(for display: DisplayIdentity) {
+        guard !isReadOnlyDueToNewerArchive else { return }
         archive.assignments.removeValue(forKey: display.key)
         persist()
     }
@@ -97,18 +113,17 @@ public final class LayoutStore {
 
     private static func load(from storage: SettingsStorage) -> (LayoutArchive, Bool) {
         guard let data = storage.data(forKey: storageKey) else { return (LayoutArchive(), false) }
+
+        // Version first, on its own. See LayoutArchiveVersion.
+        if let envelope = try? JSONDecoder().decode(LayoutArchiveVersion.self, from: data),
+           envelope.version > LayoutArchive.currentVersion {
+            ZonesLog.error("Zones", "layout archive version \(envelope.version) is newer "
+                           + "than \(LayoutArchive.currentVersion); running read-only")
+            return (LayoutArchive(), true)
+        }
+
         do {
-            let archive = try JSONDecoder().decode(LayoutArchive.self, from: data)
-            guard archive.version <= LayoutArchive.currentVersion else {
-                // Written by a newer Zones. Reading it with this version's
-                // assumptions could silently mangle the layouts, so start
-                // clean and leave the stored data untouched for the newer
-                // version to find.
-                ZonesLog.error("Zones", "layout archive version \(archive.version) is newer "
-                               + "than \(LayoutArchive.currentVersion); running read-only")
-                return (LayoutArchive(), true)
-            }
-            return (archive, false)
+            return (try JSONDecoder().decode(LayoutArchive.self, from: data), false)
         } catch {
             // Matches AppSettings: unreadable data must not stop the app.
             // Corrupt is not the same as newer — corrupt data is safe to
