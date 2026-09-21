@@ -36,8 +36,13 @@ public enum ZoneResolver {
     /// here. Mapping `zone.rect.minY` straight onto `area.minY` puts the top
     /// row of a layout along the bottom of the display, which looks plausible
     /// on a symmetric layout and is wrong on every other one.
+    /// - Parameter adjacentEdges: which edges abut another zone, and so take
+    ///   half a gap. Pass `nil` to infer it from the zone's position in the
+    ///   unit square — correct for a regular tiling, approximate for anything
+    ///   with a hole or a stepped edge. `resolveAll` computes real adjacency.
     public static func resolve(_ zone: Zone, in area: CGRect,
-                               spacing: ZoneSpacing = .none) -> CGRect {
+                               spacing: ZoneSpacing = .none,
+                               adjacentEdges: ZoneEdges? = nil) -> CGRect {
         let padded = area.insetBy(dx: spacing.outerPadding, dy: spacing.outerPadding)
         // A display smaller than its own padding would invert the rect.
         guard padded.width > 0, padded.height > 0 else { return .zero }
@@ -50,7 +55,8 @@ public enum ZoneResolver {
             width: zone.rect.width * padded.width,
             height: zone.rect.height * padded.height
         )
-        return applyGap(to: raw, zone: zone, gap: spacing.gap)
+        let edges = adjacentEdges ?? inferredEdges(for: zone)
+        return applyGap(to: raw, edges: edges, gap: spacing.gap)
     }
 
     /// Inset each edge that abuts another zone by half the gap.
@@ -59,15 +65,25 @@ public enum ZoneResolver {
     /// padding the user asked for at the display's boundary. The vertical
     /// insets are named for what the *user* sees, which after the Y flip means
     /// the zone's normalized top edge moves the rect's `maxY`.
-    private static func applyGap(to rect: CGRect, zone: Zone, gap: Double) -> CGRect {
+    /// Fallback for a zone resolved without its layout.
+    private static func inferredEdges(for zone: Zone) -> ZoneEdges {
+        let epsilon = 0.0001
+        var edges: ZoneEdges = []
+        if zone.rect.minX > epsilon { edges.insert(.left) }
+        if zone.rect.maxX < 1 - epsilon { edges.insert(.right) }
+        if zone.rect.minY > epsilon { edges.insert(.top) }
+        if zone.rect.maxY < 1 - epsilon { edges.insert(.bottom) }
+        return edges
+    }
+
+    private static func applyGap(to rect: CGRect, edges: ZoneEdges, gap: Double) -> CGRect {
         guard gap > 0 else { return rect }
         let half = gap / 2
-        let epsilon = 0.0001
 
-        let insetLeft = zone.rect.minX > epsilon ? half : 0
-        let insetRight = zone.rect.maxX < 1 - epsilon ? half : 0
-        let insetAbove = zone.rect.minY > epsilon ? half : 0
-        let insetBelow = zone.rect.maxY < 1 - epsilon ? half : 0
+        let insetLeft = edges.contains(.left) ? half : 0
+        let insetRight = edges.contains(.right) ? half : 0
+        let insetAbove = edges.contains(.top) ? half : 0
+        let insetBelow = edges.contains(.bottom) ? half : 0
 
         let result = CGRect(
             x: rect.minX + insetLeft,
@@ -81,8 +97,12 @@ public enum ZoneResolver {
     }
 
     /// Resolve every zone in a layout.
+    /// Resolve every zone, using real adjacency within the layout.
     public static func resolveAll(_ layout: ZoneLayout, in area: CGRect,
                                   spacing: ZoneSpacing = .none) -> [CGRect] {
-        layout.zones.map { resolve($0, in: area, spacing: spacing) }
+        layout.zones.map {
+            resolve($0, in: area, spacing: spacing,
+                    adjacentEdges: layout.adjacentEdges(for: $0))
+        }
     }
 }

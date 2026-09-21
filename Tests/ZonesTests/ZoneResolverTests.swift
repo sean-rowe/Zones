@@ -99,3 +99,59 @@ final class ZoneResolverTests: XCTestCase {
         XCTAssertEqual(rect, .zero)
     }
 }
+
+/// Gaps belong on edges that actually touch another zone.
+final class ZoneAdjacencyTests: XCTestCase {
+
+    private let area = CGRect(x: 0, y: 0, width: 1000, height: 1000)
+
+    func testRegularGridReportsInteriorEdgesAsAdjacent() {
+        let grid = LayoutTemplate.grid(rows: 2, columns: 2)
+        // Top-left zone: neighbours to its right and below, nothing above/left.
+        let edges = grid.adjacentEdges(for: grid.zones[0])
+        XCTAssertTrue(edges.contains(.right))
+        XCTAssertTrue(edges.contains(.bottom))
+        XCTAssertFalse(edges.contains(.left))
+        XCTAssertFalse(edges.contains(.top))
+    }
+
+    func testAZoneWithNothingBesideItGetsNoGapThere() {
+        // An L-shaped layout: the tall left column, and a short block that
+        // touches only the upper half of its right edge.
+        let tall = Zone(index: 0, rect: CGRect(x: 0, y: 0, width: 0.5, height: 1))
+        let upperRight = Zone(index: 1, rect: CGRect(x: 0.5, y: 0, width: 0.5, height: 0.5))
+        let layout = ZoneLayout(name: "L", zones: [tall, upperRight])
+
+        // The lone zone's bottom edge is at the unit square's edge, and its
+        // top edge touches nothing at all.
+        let loneEdges = layout.adjacentEdges(for: layout.zones[1])
+        XCTAssertTrue(loneEdges.contains(.left))
+        XCTAssertFalse(loneEdges.contains(.right))
+        XCTAssertFalse(loneEdges.contains(.top))
+        XCTAssertFalse(loneEdges.contains(.bottom),
+                       "nothing sits below the upper-right block")
+    }
+
+    func testCornerTouchingZonesAreNotTreatedAsAdjacent() {
+        // Two zones meeting only at a corner share no edge, so neither should
+        // be shrunk on that side.
+        let topLeft = Zone(index: 0, rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.5))
+        let bottomRight = Zone(index: 1, rect: CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5))
+        let layout = ZoneLayout(name: "Diagonal", zones: [topLeft, bottomRight])
+
+        XCTAssertFalse(layout.adjacentEdges(for: layout.zones[0]).contains(.right))
+        XCTAssertFalse(layout.adjacentEdges(for: layout.zones[0]).contains(.bottom))
+    }
+
+    func testResolveAllUsesRealAdjacencyNotPosition() {
+        let tall = Zone(index: 0, rect: CGRect(x: 0, y: 0, width: 0.5, height: 1))
+        let upperRight = Zone(index: 1, rect: CGRect(x: 0.5, y: 0, width: 0.5, height: 0.5))
+        let layout = ZoneLayout(name: "L", zones: [tall, upperRight])
+        let rects = ZoneResolver.resolveAll(layout, in: area,
+                                            spacing: ZoneSpacing(outerPadding: 0, gap: 40))
+
+        // The block's lower edge abuts nothing, so it must reach exactly the
+        // midpoint rather than being pulled up by half a gap.
+        XCTAssertEqual(rects[1].minY, area.midY, accuracy: 0.001)
+    }
+}

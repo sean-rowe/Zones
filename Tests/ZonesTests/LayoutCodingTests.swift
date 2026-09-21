@@ -20,19 +20,23 @@ final class LayoutCodingTests: XCTestCase {
     }
 
     func testDecodingReindexesZonesRatherThanTrustingStoredIndices() throws {
-        // Indices on disk can disagree with array order after an edit by an
-        // older version. Array order is the truth.
-        var layout = LayoutTemplate.columns(3)
-        var scrambled = layout.zones
-        scrambled[0].index = 77
-        scrambled[1].index = 77
-        scrambled[2].index = 77
-        layout.replaceZones(scrambled)
+        // The JSON has to carry the bad indices itself. Building this through
+        // replaceZones would reindex before encoding, so the decoder would be
+        // handed [0, 1, 2] and the test would pass without proving anything.
+        let json = """
+        {"id":"E1B2C3D4-0000-4000-8000-0000000000AA","name":"Scrambled",
+         "origin":{"custom":{}},
+         "zones":[
+           {"id":"00000000-0000-4000-8000-000000000001","index":77,
+            "rect":[[0.0,0.0],[0.5,1.0]]},
+           {"id":"00000000-0000-4000-8000-000000000002","index":77,
+            "rect":[[0.5,0.0],[0.5,1.0]]}
+         ]}
+        """
+        let decoded = try JSONDecoder().decode(ZoneLayout.self, from: Data(json.utf8))
 
-        let data = try JSONEncoder().encode(layout)
-        let decoded = try JSONDecoder().decode(ZoneLayout.self, from: data)
-
-        XCTAssertEqual(decoded.zones.map(\.index), [0, 1, 2])
+        XCTAssertEqual(decoded.zones.map(\.index), [0, 1],
+                       "stored indices must be replaced by array order")
     }
 
     func testRoundTripPreservesIdentityAndGeometry() throws {
