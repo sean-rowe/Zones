@@ -77,10 +77,8 @@ final class LayoutStoreVersionGuardTests: XCTestCase {
         store.installBuiltInsIfEmpty()
         store.save(LayoutTemplate.columns(2))
 
-        let data = storage.data(forKey: LayoutStore.storageKey)!
-        let object = try? JSONSerialization.jsonObject(with: data)
-        XCTAssertEqual((object as? [String: Any])?["version"] as? Int, 9999,
-                       "the newer archive was overwritten")
+        XCTAssertEqual(storage.data(forKey: LayoutStore.storageKey), Data(json.utf8),
+                       "the newer archive was modified")
     }
 
     func testEveryMutationIsRefusedWhileReadOnly() {

@@ -38,7 +38,7 @@ Feature: Layout persistence
     Given a layout store whose archive claims a future version
     When I install the built-in layouts
     Then the store has no layouts
-    And the stored bytes still claim the future version
+    And the stored bytes are unchanged
 
   Scenario: Corrupt storage is replaceable, unlike a newer archive
     Given a layout store backed by corrupt storage

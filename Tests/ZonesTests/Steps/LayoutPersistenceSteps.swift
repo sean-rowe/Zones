@@ -6,6 +6,7 @@ final class LayoutPersistenceSteps {
     private var store: LayoutStore!
     private var savedIDs: [String: UUID] = [:]
     private var display = DisplayIdentity(key: "unset", source: .uuid)
+    private var originalBytes: Data?
 
     func register(in registry: StepRegistry) {
         registry.given("an empty layout store") { _ in
@@ -21,9 +22,16 @@ final class LayoutPersistenceSteps {
         }
 
         registry.given("a layout store whose archive claims a future version") { _ in
-            let json = #"{"version": 9999, "layouts": [], "assignments": {}}"#
-            self.storage = InMemorySettingsStorage(
-                seed: [LayoutStore.storageKey: Data(json.utf8)])
+            // Carries a field this version knows nothing about, which is the
+            // realistic shape of a newer archive and the thing most likely to
+            // be silently dropped by a partial rewrite.
+            let json = #"""
+            {"version": 9999, "layouts": [], "assignments": {},
+             "zoneRulesAddedInAFutureVersion": [{"app": "Terminal", "zone": 2}]}
+            """#
+            let bytes = Data(json.utf8)
+            self.originalBytes = bytes
+            self.storage = InMemorySettingsStorage(seed: [LayoutStore.storageKey: bytes])
             self.store = LayoutStore(storage: self.storage)
         }
 
@@ -89,13 +97,14 @@ final class LayoutPersistenceSteps {
             XCTAssertFalse(self.store.layouts.isEmpty)
         }
 
-        registry.then("the stored bytes still claim the future version") { _ in
+        registry.then("the stored bytes are unchanged") { _ in
             guard let data = self.storage.data(forKey: LayoutStore.storageKey) else {
                 return XCTFail("the newer archive must not have been deleted")
             }
-            let object = try? JSONSerialization.jsonObject(with: data)
-            let json = object as? [String: Any]
-            XCTAssertEqual(json?["version"] as? Int, 9999,
+            // Compared whole. Checking only the version field would accept a
+            // rewrite that kept the number and threw away everything the newer
+            // version had stored alongside it.
+            XCTAssertEqual(data, self.originalBytes,
                            "the newer archive must be left byte-for-byte alone")
         }
 
