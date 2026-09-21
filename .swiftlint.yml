@@ -1,6 +1,7 @@
-# CodeRabbit runs SwiftLint with opt-in rules enabled. Two of those fight the
-# way this codebase is written, so they are turned off here deliberately
-# rather than worked around at each site.
+# CodeRabbit runs SwiftLint with opt-in rules enabled. The settings below say
+# which of those this codebase accepts and which it declines, deliberately,
+# rather than working around them at each site.
+
 disabled_rules:
   # Would have every class carry an empty `deinit` purely to satisfy the rule.
   - required_deinit
@@ -12,6 +13,13 @@ opt_in_rules:
 
 excluded:
   - .build
+
+identifier_name:
+  # Geometry code reads better with short names: `x`, `y`, `w`, `h` in
+  # DisplayIdentity.geometryKey, `i` for a zone index in the generators.
+  min_length:
+    warning: 1
+    error: 1
 
 # Test step definitions read as prose and run long by design.
 type_body_length:

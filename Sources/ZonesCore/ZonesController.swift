@@ -39,6 +39,16 @@ public final class ZonesController {
         )
         permission.startMonitoring()
 
+        // Registered once, here, rather than in activateWindowManagement():
+        // that runs again on every trust change, which would stack a new
+        // observer each time permission was revoked and re-granted.
+        displays.notificationCenter.addObserver(
+            self,
+            selector: #selector(displayConfigurationDidSettle),
+            name: .displayConfigurationDidSettle,
+            object: nil
+        )
+
         let onboarding = OnboardingWindowController()
         self.onboarding = onboarding
         onboarding.presentIfNeeded { [weak self] in
@@ -128,12 +138,6 @@ public final class ZonesController {
         }
         assignDefaultLayoutsToUnassignedDisplays()
 
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(displayConfigurationDidSettle),
-            name: .displayConfigurationDidSettle,
-            object: nil
-        )
         displays.start()
 
         ZonesLog.info("Zones", "accessibility granted; window management active")
