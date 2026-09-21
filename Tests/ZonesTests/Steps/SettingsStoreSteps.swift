@@ -28,8 +28,8 @@ final class SettingsStoreSteps {
         center = NotificationCenter()
         notificationCount = 0
         settings = Settings(storage: storage, notificationCenter: center)
-        observer = center.addObserver(forName: .settingsDidChange, object: nil, queue: nil) { _ in
-            self.notificationCount += 1
+        observer = center.addObserver(forName: .settingsDidChange, object: nil, queue: nil) { [weak self] _ in
+            self?.notificationCount += 1
         }
     }
 
@@ -49,7 +49,9 @@ final class SettingsStoreSteps {
         }
 
         registry.given("a settings store whose stored JSON has an unknown key") { _ in
-            let json = #"{"zoneGap": 8, "somethingFromTheFuture": {"nested": true}}"#
+            // zoneGap must differ from the default (8), or "the known key
+            // survived" is indistinguishable from "everything fell back".
+            let json = #"{"zoneGap": 21, "somethingFromTheFuture": {"nested": true}}"#
             self.makeStore(seed: [Settings.storageKey: Data(json.utf8)])
         }
 
@@ -60,6 +62,26 @@ final class SettingsStoreSteps {
         registry.when("I change the zone gap to the value it already has") { _ in
             let existing = self.settings.current.zoneGap
             self.settings.update { $0.zoneGap = existing }
+        }
+
+        registry.when("I set the zone gap to -(\\d+)") { args in
+            self.settings.update { $0.zoneGap = -Double(args[0])! }
+        }
+
+        registry.when("I set the overlay opacity to (\\d+)") { args in
+            self.settings.update { $0.overlayOpacity = Double(args[0])! }
+        }
+
+        registry.when("I set the overlay padding to -(\\d+)") { args in
+            self.settings.update { $0.outerPadding = -Double(args[0])! }
+        }
+
+        registry.then("the overlay opacity is (\\d+)") { args in
+            XCTAssertEqual(self.settings.current.overlayOpacity, Double(args[0])!)
+        }
+
+        registry.then("exactly (\\d+) settingsDidChange notification was posted") { args in
+            XCTAssertEqual(self.notificationCount, Int(args[0])!)
         }
 
         registry.then("the stored settings JSON contains a zone gap of (\\d+)") { args in
@@ -78,6 +100,16 @@ final class SettingsStoreSteps {
 
         registry.then("the settings equal the defaults") { _ in
             XCTAssertEqual(self.settings.current, AppSettings())
+        }
+
+        registry.then("the zone gap is (\\d+)") { args in
+            XCTAssertEqual(self.settings.current.zoneGap, Double(args[0])!)
+        }
+
+        registry.then("the other settings equal the defaults") { _ in
+            var expected = AppSettings()
+            expected.zoneGap = self.settings.current.zoneGap
+            XCTAssertEqual(self.settings.current, expected)
         }
 
         registry.then("the store did not crash") { _ in

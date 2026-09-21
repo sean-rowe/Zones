@@ -21,7 +21,10 @@ public final class AccessibilityPermission {
 
     private var timer: Timer?
     private var lastKnownTrust: Bool
-    private let notificationCenter: NotificationCenter
+    /// Exposed so collaborators observe the same center this instance posts on.
+    /// Defaulting them to `.default` independently meant an injected test center
+    /// was posted to while the observer listened elsewhere, and nothing fired.
+    public let notificationCenter: NotificationCenter
     private let trustProvider: () -> Bool
 
     /// - Parameter trustProvider: injectable so tests can drive trust flipping
@@ -60,10 +63,13 @@ public final class AccessibilityPermission {
     /// start working without a relaunch.
     public func startMonitoring(interval: TimeInterval = 1.0) {
         guard timer == nil else { return }
-        let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        // Built unscheduled, then added once in .common mode. `scheduledTimer`
+        // would have registered it in .default as well, leaving two
+        // registrations for one timer.
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             self?.checkForChange()
         }
-        // Keep firing while menus are open or a window is being dragged.
+        // .common keeps it firing while menus are open or a window is dragged.
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
     }

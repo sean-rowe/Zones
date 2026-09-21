@@ -16,11 +16,13 @@ final class AccessibilityPermissionSteps {
         self.trusted = trusted
         center = NotificationCenter()
         notificationCount = 0
+        // Weak throughout: the steps object owns the permission, which owns the
+        // trust closure, which would otherwise own the steps object back.
         permission = AccessibilityPermission(notificationCenter: center,
-                                             trustProvider: { self.trusted })
+                                             trustProvider: { [weak self] in self?.trusted ?? false })
         observer = center.addObserver(forName: .accessibilityTrustDidChange,
-                                      object: nil, queue: nil) { _ in
-            self.notificationCount += 1
+                                      object: nil, queue: nil) { [weak self] _ in
+            self?.notificationCount += 1
         }
     }
 

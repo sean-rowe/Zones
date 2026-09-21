@@ -50,6 +50,20 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     public init() {}
 
+    /// Bring every bounded value into range.
+    ///
+    /// Applied on decode *and* at the mutation boundary. Clamping only on
+    /// decode left the obvious hole: `Settings.update { $0.zoneGap = -50 }`
+    /// persisted and broadcast a negative gap, which then reached geometry
+    /// code as a silently wrong number rather than an obviously wrong one.
+    public func normalized() -> AppSettings {
+        var copy = self
+        copy.zoneGap = max(0, zoneGap)
+        copy.outerPadding = max(0, outerPadding)
+        copy.overlayOpacity = min(1, max(0, overlayOpacity))
+        return copy
+    }
+
     private enum CodingKeys: String, CodingKey {
         case activationModifier, spanModifier, zoneGap, outerPadding
         case overlayOpacity, snapOnAppLaunch, restoreOnDisplayChange
@@ -76,5 +90,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
         snapOnAppLaunch = value(.snapOnAppLaunch, defaults.snapOnAppLaunch)
         restoreOnDisplayChange = value(.restoreOnDisplayChange, defaults.restoreOnDisplayChange)
         flashZonesOnLayoutSwitch = value(.flashZonesOnLayoutSwitch, defaults.flashZonesOnLayoutSwitch)
+
+        // These come from a file a user can edit, so the same normalization
+        // the mutation boundary applies is applied here too.
+        self = normalized()
     }
 }

@@ -13,6 +13,13 @@ struct ParsedScenario {
 struct ParsedFeature {
     let name: String
     let scenarios: [ParsedScenario]
+    /// Lines inside a scenario that matched no step keyword.
+    ///
+    /// Surfaced rather than skipped: a mistyped keyword ("Give a counter...")
+    /// used to vanish silently, so the scenario ran with one fewer step and
+    /// still passed. A harness that quietly drops steps is worse than no
+    /// harness.
+    let unrecognisedLines: [String]
 }
 
 /// A deliberately small Gherkin parser: Feature, Scenario, and
@@ -24,6 +31,7 @@ enum FeatureParser {
         var currentName: String?
         var currentSteps: [ParsedStep] = []
         var lastKeyword = "given"
+        var unrecognised: [String] = []
 
         func closeScenario() {
             guard let name = currentName else { return }
@@ -47,10 +55,15 @@ enum FeatureParser {
                 let resolved = (keyword == "and" || keyword == "but") ? lastKeyword : keyword
                 lastKeyword = resolved
                 currentSteps.append(ParsedStep(keyword: resolved, text: text))
+            } else if currentName != nil {
+                // Prose above the first Scenario is the feature description and
+                // is fine. Prose *inside* a scenario is a broken step.
+                unrecognised.append(line)
             }
         }
         closeScenario()
-        return ParsedFeature(name: featureName, scenarios: scenarios)
+        return ParsedFeature(name: featureName, scenarios: scenarios,
+                             unrecognisedLines: unrecognised)
     }
 
     private static func value(of prefix: String, in line: String) -> String? {

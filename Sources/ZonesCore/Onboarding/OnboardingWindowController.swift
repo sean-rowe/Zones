@@ -72,7 +72,6 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
     }
 
     @objc private func finish() {
-        defaults.set(true, forKey: Self.hasRunKey)
         window?.close()
     }
 
@@ -83,6 +82,10 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
     /// closing the window left the app running with no status item and no way
     /// to reach it.
     public func windowWillClose(_ notification: Notification) {
+        // Record completion here rather than in finish(), so closing with the
+        // red button also counts. Persisting only on the Continue button meant
+        // a user who closed the window was shown onboarding again every launch.
+        defaults.set(true, forKey: Self.hasRunKey)
         let finish = onFinish
         onFinish = nil
         finish?()
