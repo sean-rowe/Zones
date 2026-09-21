@@ -51,6 +51,26 @@ final class LayoutPersistenceSteps {
             self.store.assign(layoutID: id, to: self.display)
         }
 
+        registry.when("I assign it to a display identified only by geometry") { _ in
+            self.display = DisplayIdentity(
+                key: DisplayIdentity.geometryKey(for: CGRect(x: 0, y: 0, width: 1920, height: 1080)),
+                source: .geometry)
+            self.store.assign(layoutID: self.savedIDs.values.first!, to: self.display)
+        }
+
+        registry.then("that display is assigned the layout named \"(.+)\"") { args in
+            XCTAssertEqual(self.store.assignedLayout(for: self.display)?.name, args[0])
+        }
+
+        registry.then("the stored archive holds no assignments") { _ in
+            guard let data = self.storage.data(forKey: LayoutStore.storageKey),
+                  let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            else { return XCTFail("nothing was persisted at all") }
+            let assignments = json["assignments"] as? [String: Any] ?? [:]
+            XCTAssertTrue(assignments.isEmpty,
+                          "a geometry key names a position, not a display, and must not persist")
+        }
+
         registry.when("I delete the layout named \"(.+)\"") { args in
             self.store.delete(id: self.savedIDs[args[0]]!)
         }

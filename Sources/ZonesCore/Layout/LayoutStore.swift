@@ -35,6 +35,15 @@ public final class LayoutStore {
     private let storage: SettingsStorage
     private var archive: LayoutArchive
 
+    /// Assignments for displays that could not supply a UUID.
+    ///
+    /// Held in memory for the session only. A geometry key names a position,
+    /// not a display, so persisting one means the next monitor plugged into
+    /// that position silently inherits the layout — and there is no way to
+    /// tell that apart from the same monitor coming back. Losing the
+    /// assignment at quit is the safer failure.
+    private var sessionAssignments: [String: UUID] = [:]
+
     /// True when the stored archive was written by a newer Zones.
     ///
     /// In that state the store runs read-only in memory. Saying "ignore it"
@@ -76,6 +85,7 @@ public final class LayoutStore {
         guard !isReadOnlyDueToNewerArchive else { return }
         archive.layouts.removeAll { $0.id == id }
         archive.assignments = archive.assignments.filter { $0.value != id }
+        sessionAssignments = sessionAssignments.filter { $0.value != id }
         persist()
     }
 
@@ -83,20 +93,35 @@ public final class LayoutStore {
 
     public func assign(layoutID: UUID, to display: DisplayIdentity) {
         guard !isReadOnlyDueToNewerArchive else { return }
-        archive.assignments[display.key] = layoutID
-        persist()
+        switch display.source {
+        case .uuid:
+            archive.assignments[display.key] = layoutID
+            persist()
+        case .geometry:
+            sessionAssignments[display.key] = layoutID
+        }
     }
 
     /// The layout assigned to a display, if it still exists.
     public func assignedLayout(for display: DisplayIdentity) -> ZoneLayout? {
-        guard let id = archive.assignments[display.key] else { return nil }
+        let id: UUID?
+        switch display.source {
+        case .uuid:     id = archive.assignments[display.key]
+        case .geometry: id = sessionAssignments[display.key]
+        }
+        guard let id else { return nil }
         return layout(id: id)
     }
 
     public func clearAssignment(for display: DisplayIdentity) {
         guard !isReadOnlyDueToNewerArchive else { return }
-        archive.assignments.removeValue(forKey: display.key)
-        persist()
+        switch display.source {
+        case .uuid:
+            archive.assignments.removeValue(forKey: display.key)
+            persist()
+        case .geometry:
+            sessionAssignments.removeValue(forKey: display.key)
+        }
     }
 
     /// Seed the built-in layouts on a first run.

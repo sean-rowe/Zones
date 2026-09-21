@@ -45,3 +45,12 @@ Feature: Layout persistence
     When I install the built-in layouts
     Then the store has some layouts
     And the store is not read only
+
+  Scenario: A UUID-less display keeps its assignment for the session only
+    Given an empty layout store
+    When I save a layout named "Fallback" with 2 zones
+    And I assign it to a display identified only by geometry
+    Then that display is assigned the layout named "Fallback"
+    And the stored archive holds no assignments
+    When the store is reloaded from the same storage
+    Then that display has no assigned layout
