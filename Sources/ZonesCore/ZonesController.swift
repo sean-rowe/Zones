@@ -9,14 +9,20 @@ import AppKit
 public final class ZonesController {
     private let permission: AccessibilityPermission
     private let settings: Settings
+    private let layouts: LayoutStore
+    private let displays: DisplayObserver
     private var statusItem: NSStatusItem?
     private var permissionWindow: PermissionWindowController?
     private var onboarding: OnboardingWindowController?
 
     public init(permission: AccessibilityPermission = .shared,
-                settings: Settings = .shared) {
+                settings: Settings = .shared,
+                layouts: LayoutStore = .shared,
+                displays: DisplayObserver = .shared) {
         self.permission = permission
         self.settings = settings
+        self.layouts = layouts
+        self.displays = displays
     }
 
     public func start() {
@@ -32,6 +38,16 @@ public final class ZonesController {
             object: nil
         )
         permission.startMonitoring()
+
+        // Registered once, here, rather than in activateWindowManagement():
+        // that runs again on every trust change, which would stack a new
+        // observer each time permission was revoked and re-granted.
+        displays.notificationCenter.addObserver(
+            self,
+            selector: #selector(displayConfigurationDidSettle),
+            name: .displayConfigurationDidSettle,
+            object: nil
+        )
 
         let onboarding = OnboardingWindowController()
         self.onboarding = onboarding
@@ -116,8 +132,32 @@ public final class ZonesController {
 
     private func activateWindowManagement() {
         refreshStatusMenuItem()
+
+        if layouts.installBuiltInsIfEmpty() {
+            ZonesLog.info("Zones", "installed \(layouts.layouts.count) built-in layouts")
+        }
+        assignDefaultLayoutsToUnassignedDisplays()
+
+        displays.start()
+
         ZonesLog.info("Zones", "accessibility granted; window management active")
-        // Layout store, drag monitor, overlays and hotkeys attach here as the
-        // later epics land.
+        // Drag monitor, overlays and hotkeys attach here as the later epics land.
+    }
+
+    /// Give every display a layout, so a newly attached monitor is usable
+    /// immediately rather than having no zones until the user opens the editor.
+    private func assignDefaultLayoutsToUnassignedDisplays() {
+        guard let fallback = layouts.layouts.first else { return }
+        for (identity, _) in DisplayObserver.currentDisplays()
+        where layouts.assignedLayout(for: identity) == nil {
+            layouts.assign(layoutID: fallback.id, to: identity)
+            ZonesLog.info("Zones", "assigned default layout to display \(identity.key)")
+        }
+    }
+
+    @objc private func displayConfigurationDidSettle() {
+        // Normalized zones re-resolve proportionally on their own; what needs
+        // doing here is giving any newly arrived display a layout.
+        assignDefaultLayoutsToUnassignedDisplays()
     }
 }
