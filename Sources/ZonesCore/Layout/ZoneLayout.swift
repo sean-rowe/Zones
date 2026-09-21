@@ -53,6 +53,22 @@ public struct ZoneLayout: Codable, Equatable, Identifiable, Sendable {
     public var coverage: Double {
         zones.reduce(0) { $0 + Double($1.rect.width * $1.rect.height) }
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, zones, origin
+    }
+
+    /// Decoding routes through the memberwise initializer so zones are
+    /// reindexed. The synthesized one would restore whatever indices were on
+    /// disk, which is how a layout edited by an older version comes back with
+    /// indices that no longer match its array order.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try container.decode(UUID.self, forKey: .id),
+                  name: try container.decode(String.self, forKey: .name),
+                  zones: try container.decode([Zone].self, forKey: .zones),
+                  origin: try container.decode(LayoutOrigin.self, forKey: .origin))
+    }
 }
 
 /// Where a layout came from.

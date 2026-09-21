@@ -51,4 +51,20 @@ public struct Zone: Codable, Equatable, Identifiable, Sendable {
     public func union(_ other: Zone) -> Zone {
         Zone(index: min(index, other.index), rect: rect.union(other.rect))
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, index, rect
+    }
+
+    /// Decoding routes through `init(id:index:rect:)` so the clamp applies.
+    ///
+    /// The synthesized initializer would assign `rect` directly and skip it,
+    /// which means a hand-edited or corrupted file could put a zone outside
+    /// the unit square — the one thing construction is supposed to prevent.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try container.decode(UUID.self, forKey: .id),
+                  index: try container.decode(Int.self, forKey: .index),
+                  rect: try container.decode(CGRect.self, forKey: .rect))
+    }
 }
