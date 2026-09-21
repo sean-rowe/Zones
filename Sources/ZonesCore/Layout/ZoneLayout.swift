@@ -71,6 +71,51 @@ public struct ZoneLayout: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// The four edges of a zone.
+public struct ZoneEdges: OptionSet, Sendable {
+    public let rawValue: Int
+    public init(rawValue: Int) { self.rawValue = rawValue }
+
+    public static let left = ZoneEdges(rawValue: 1 << 0)
+    public static let right = ZoneEdges(rawValue: 1 << 1)
+    /// The zone's visual top — its smallest normalized Y.
+    public static let top = ZoneEdges(rawValue: 1 << 2)
+    public static let bottom = ZoneEdges(rawValue: 1 << 3)
+
+    public static let all: ZoneEdges = [.left, .right, .top, .bottom]
+}
+
+public extension ZoneLayout {
+    /// Which of a zone's edges actually touch another zone.
+    ///
+    /// Gaps belong on shared edges only. Inferring them from position in the
+    /// unit square instead — "not at 0, so something must be to the left" —
+    /// is right for a regular grid and wrong for any layout with a hole or a
+    /// stepped edge, where a zone gets shrunk away from nothing.
+    func adjacentEdges(for zone: Zone) -> ZoneEdges {
+        let epsilon = 0.0001
+        var edges: ZoneEdges = []
+        let rect = zone.rect
+
+        for other in zones where other.id != zone.id {
+            let otherRect = other.rect
+            // Perpendicular overlap, or the two only meet at a corner.
+            let verticalOverlap = min(rect.maxY, otherRect.maxY) - max(rect.minY, otherRect.minY)
+            let horizontalOverlap = min(rect.maxX, otherRect.maxX) - max(rect.minX, otherRect.minX)
+
+            if verticalOverlap > epsilon {
+                if abs(otherRect.maxX - rect.minX) < epsilon { edges.insert(.left) }
+                if abs(otherRect.minX - rect.maxX) < epsilon { edges.insert(.right) }
+            }
+            if horizontalOverlap > epsilon {
+                if abs(otherRect.maxY - rect.minY) < epsilon { edges.insert(.top) }
+                if abs(otherRect.minY - rect.maxY) < epsilon { edges.insert(.bottom) }
+            }
+        }
+        return edges
+    }
+}
+
 /// Where a layout came from.
 public enum LayoutOrigin: Codable, Equatable, Sendable {
     case custom
