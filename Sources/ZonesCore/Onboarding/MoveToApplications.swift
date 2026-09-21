@@ -68,30 +68,61 @@ public enum MoveToApplications {
     }
 
     private static func move(from bundleURL: URL) -> Bool {
+        let fm = FileManager.default
         let destination = URL(fileURLWithPath: "/Applications")
             .appendingPathComponent(bundleURL.lastPathComponent)
+
+        // Stage beside the destination, then swap. Deleting the installed copy
+        // first and then copying would destroy a working installation if the
+        // copy failed — leaving the user with no app at all.
+        let staging = destination.deletingLastPathComponent()
+            .appendingPathComponent(".\(bundleURL.lastPathComponent).incoming-\(UUID().uuidString)")
+
         do {
-            if FileManager.default.fileExists(atPath: destination.path) {
-                try FileManager.default.removeItem(at: destination)
+            try fm.copyItem(at: bundleURL, to: staging)
+            if fm.fileExists(atPath: destination.path) {
+                _ = try fm.replaceItemAt(destination, withItemAt: staging)
+            } else {
+                try fm.moveItem(at: staging, to: destination)
             }
-            try FileManager.default.copyItem(at: bundleURL, to: destination)
             relaunch(at: destination)
             return true
         } catch {
+            // Never leave the staging copy behind on failure.
+            try? fm.removeItem(at: staging)
             ZonesLog.error("Zones", "move to /Applications failed: \(error)")
-            let alert = NSAlert()
-            alert.messageText = "Zones could not move itself"
-            alert.informativeText = "Drag Zones into your Applications folder manually."
-            alert.runModal()
+            reportFailure("Zones could not move itself",
+                          "Drag Zones into your Applications folder manually.")
             return false
         }
     }
 
+    /// Launch the moved copy, and only then quit this one.
+    ///
+    /// Terminating regardless of the result would quit the running app even
+    /// when the relaunch failed, leaving the user with nothing running.
     private static func relaunch(at url: URL) {
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.createsNewApplicationInstance = true
-        NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, _ in
-            DispatchQueue.main.async { NSApp.terminate(nil) }
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration) { app, error in
+            DispatchQueue.main.async {
+                guard error == nil, app != nil else {
+                    ZonesLog.error("Zones", "relaunch from /Applications failed: "
+                                   + String(describing: error))
+                    reportFailure("Zones was moved but could not restart",
+                                  "Zones is now in your Applications folder. "
+                                  + "Quit this copy and open it from there.")
+                    return
+                }
+                NSApp.terminate(nil)
+            }
         }
+    }
+
+    private static func reportFailure(_ message: String, _ detail: String) {
+        let alert = NSAlert()
+        alert.messageText = message
+        alert.informativeText = detail
+        alert.runModal()
     }
 }
