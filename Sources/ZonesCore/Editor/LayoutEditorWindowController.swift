@@ -76,6 +76,9 @@ public final class LayoutEditorWindowController: NSWindowController, NSWindowDel
         preview.onLayoutChanged = { [weak self] updated in
             self?.working = updated
         }
+        preview.onSelectionChanged = { [weak self] _ in
+            self?.updateControls()
+        }
 
         templatePopUp = NSPopUpButton()
         templatePopUp.addItems(withTitles: Self.templates.map(\.title))

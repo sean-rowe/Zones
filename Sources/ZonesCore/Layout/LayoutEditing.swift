@@ -45,66 +45,92 @@ public enum LayoutEditing {
 
     /// Every draggable divider in a layout.
     public static func splitters(in layout: ZoneLayout) -> [Splitter] {
-        var found: [String: Splitter] = [:]
+        var candidates: [Splitter] = []
 
         for zone in layout.zones {
             for other in layout.zones where other.id != zone.id {
                 // Vertical: zone's right edge meets other's left edge.
-                if abs(zone.rect.maxX - other.rect.minX) < epsilon {
-                    let overlap = verticalOverlap(zone.rect, other.rect)
-                    if let overlap {
-                        insert(&found, axis: .vertical, position: zone.rect.maxX,
-                               leading: zone.id, trailing: other.id, span: overlap)
-                    }
+                if abs(zone.rect.maxX - other.rect.minX) < epsilon,
+                   let overlap = verticalOverlap(zone.rect, other.rect) {
+                    candidates.append(Splitter(axis: .vertical, position: Double(zone.rect.maxX),
+                                               leadingZoneIDs: [zone.id],
+                                               trailingZoneIDs: [other.id], span: overlap))
                 }
                 // Horizontal: zone's bottom edge (larger normalized Y) meets
                 // other's top edge.
-                if abs(zone.rect.maxY - other.rect.minY) < epsilon {
-                    let overlap = horizontalOverlap(zone.rect, other.rect)
-                    if let overlap {
-                        insert(&found, axis: .horizontal, position: zone.rect.maxY,
-                               leading: zone.id, trailing: other.id, span: overlap)
-                    }
+                if abs(zone.rect.maxY - other.rect.minY) < epsilon,
+                   let overlap = horizontalOverlap(zone.rect, other.rect) {
+                    candidates.append(Splitter(axis: .horizontal, position: Double(zone.rect.maxY),
+                                               leadingZoneIDs: [zone.id],
+                                               trailingZoneIDs: [other.id], span: overlap))
                 }
             }
         }
-        return found.values.sorted { ($0.axis.rawValue, $0.position) < ($1.axis.rawValue, $1.position) }
+        return coalesce(candidates)
+    }
+
+    /// Combine candidates that are genuinely the same divider.
+    ///
+    /// Same axis and position is not enough. Two column pairs stacked one above
+    /// the other share an x but are two separate dividers, and merging them
+    /// would make dragging either one move zones in the other. They only
+    /// combine when their spans also touch or overlap.
+    static func coalesce(_ candidates: [Splitter]) -> [Splitter] {
+        var groups: [Splitter] = []
+
+        for candidate in candidates {
+            // Absorb every existing group this candidate connects to — it may
+            // bridge two that were previously disjoint.
+            var merged = candidate
+            var remaining: [Splitter] = []
+            for group in groups {
+                if group.axis == merged.axis,
+                   abs(group.position - merged.position) < epsilon,
+                   spansTouch(group.span, merged.span) {
+                    merged = combine(group, merged)
+                } else {
+                    remaining.append(group)
+                }
+            }
+            remaining.append(merged)
+            groups = remaining
+        }
+        return groups.sorted {
+            ($0.axis.rawValue, $0.position, $0.span.lowerBound)
+                < ($1.axis.rawValue, $1.position, $1.span.lowerBound)
+        }
+    }
+
+    private static func spansTouch(_ a: ClosedRange<Double>, _ b: ClosedRange<Double>) -> Bool {
+        // Touching counts: two zones stacked against the same divider meet at a
+        // shared boundary and form one continuous grab area.
+        a.lowerBound <= b.upperBound + epsilon && b.lowerBound <= a.upperBound + epsilon
+    }
+
+    private static func combine(_ a: Splitter, _ b: Splitter) -> Splitter {
+        let lower = min(a.span.lowerBound, b.span.lowerBound)
+        let upper = max(a.span.upperBound, b.span.upperBound)
+        var leading = a.leadingZoneIDs
+        for id in b.leadingZoneIDs where !leading.contains(id) { leading.append(id) }
+        var trailing = a.trailingZoneIDs
+        for id in b.trailingZoneIDs where !trailing.contains(id) { trailing.append(id) }
+        return Splitter(axis: a.axis, position: a.position,
+                        leadingZoneIDs: leading, trailingZoneIDs: trailing,
+                        span: lower...upper)
     }
 
     private static func verticalOverlap(_ a: CGRect, _ b: CGRect) -> ClosedRange<Double>? {
         let lower = max(a.minY, b.minY), upper = min(a.maxY, b.maxY)
         guard upper - lower > epsilon else { return nil }
-        return Double(lower)...Double(upper)
+        let l = Double(lower), u = Double(upper)
+        return l...u
     }
 
     private static func horizontalOverlap(_ a: CGRect, _ b: CGRect) -> ClosedRange<Double>? {
         let lower = max(a.minX, b.minX), upper = min(a.maxX, b.maxX)
         guard upper - lower > epsilon else { return nil }
-        return Double(lower)...Double(upper)
-    }
-
-    /// Splitters at the same axis and position are one divider, so their zone
-    /// lists and span merge rather than producing duplicates.
-    private static func insert(_ found: inout [String: Splitter], axis: SplitterAxis,
-                               position: CGFloat, leading: UUID, trailing: UUID,
-                               span: ClosedRange<Double>) {
-        // Rounded so two edges that differ by floating-point noise are one key.
-        let key = "\(axis.rawValue)@\((Double(position) * 10000).rounded())"
-        if let existing = found[key] {
-            let lower = min(existing.span.lowerBound, span.lowerBound)
-            let upper = max(existing.span.upperBound, span.upperBound)
-            let leadingIDs = existing.leadingZoneIDs.contains(leading)
-                ? existing.leadingZoneIDs : existing.leadingZoneIDs + [leading]
-            let trailingIDs = existing.trailingZoneIDs.contains(trailing)
-                ? existing.trailingZoneIDs : existing.trailingZoneIDs + [trailing]
-            found[key] = Splitter(axis: axis, position: existing.position,
-                                  leadingZoneIDs: leadingIDs, trailingZoneIDs: trailingIDs,
-                                  span: lower...upper)
-        } else {
-            found[key] = Splitter(axis: axis, position: Double(position),
-                                  leadingZoneIDs: [leading], trailingZoneIDs: [trailing],
-                                  span: span)
-        }
+        let l = Double(lower), u = Double(upper)
+        return l...u
     }
 
     /// The range a splitter may be dragged within, given the minimum zone size.

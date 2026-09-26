@@ -30,6 +30,61 @@ final class LayoutEditingSteps {
             self.reload()
         }
 
+        registry.given("a layout of two column pairs separated by a full-width band") { _ in
+            // Two columns at the top, one full-width zone across the middle,
+            // two columns at the bottom. Both pairs meet at x=0.5, but the band
+            // interrupts the line, so these are two dividers that happen to
+            // share an x — not one continuous divider. Four equal 0.5x0.5
+            // zones would instead BE a 2x2 grid, where one divider is correct.
+            self.layout = ZoneLayout(name: "Banded", zones: [
+                Zone(index: 0, rect: CGRect(x: 0, y: 0, width: 0.5, height: 0.3)),
+                Zone(index: 1, rect: CGRect(x: 0.5, y: 0, width: 0.5, height: 0.3)),
+                Zone(index: 2, rect: CGRect(x: 0, y: 0.3, width: 1, height: 0.3)),
+                Zone(index: 3, rect: CGRect(x: 0, y: 0.6, width: 0.5, height: 0.4)),
+                Zone(index: 4, rect: CGRect(x: 0.5, y: 0.6, width: 0.5, height: 0.4)),
+            ])
+            self.reload()
+        }
+
+        registry.when("I drag the upper vertical splitter to (0\\.\\d+)") { args in
+            // The upper pair occupies normalized y 0...0.5, so its divider is
+            // the vertical one whose span starts at 0.
+            guard let splitter = self.splitters.first(where: {
+                $0.axis == .vertical && $0.span.lowerBound < 0.0001
+            }) else { return XCTFail("no upper vertical splitter") }
+            self.layout = LayoutEditing.move(splitter, to: Double(args[0])!, in: self.layout)
+            self.reload()
+        }
+
+        registry.then("there are (\\d+) vertical splitters at (0\\.\\d+)") { args in
+            let position = Double(args[1])!
+            let matching = self.splitters.filter {
+                $0.axis == .vertical && abs($0.position - position) < 0.0001
+            }
+            XCTAssertEqual(matching.count, Int(args[0])!,
+                           "spans: \(matching.map { $0.span })")
+        }
+
+        registry.then("the upper pair splits at (0\\.\\d+)") { args in
+            let expected = Double(args[0])!
+            let upperLeft = self.layout.zones.first { $0.rect.minY < 0.0001 && $0.rect.minX < 0.0001 }
+            XCTAssertEqual(Double(upperLeft!.rect.maxX), expected, accuracy: 0.0001)
+        }
+
+        registry.then("the lower pair still splits at (0\\.\\d+)") { args in
+            let expected = Double(args[0])!
+            let lowerLeft = self.layout.zones.first { $0.rect.minY > 0.5 && $0.rect.minX < 0.0001 }
+            XCTAssertEqual(Double(lowerLeft!.rect.maxX), expected, accuracy: 0.0001,
+                           "dragging one divider moved the other")
+        }
+
+        registry.then("that vertical splitter spans the whole height") { _ in
+            let splitter = self.splitters.first { $0.axis == .vertical }
+            XCTAssertNotNil(splitter)
+            XCTAssertEqual(splitter!.span.lowerBound, 0, accuracy: 0.0001)
+            XCTAssertEqual(splitter!.span.upperBound, 1, accuracy: 0.0001)
+        }
+
         registry.when("I drag the vertical splitter to (0\\.\\d+)") { args in
             guard let splitter = self.splitters.first(where: { $0.axis == .vertical }) else {
                 return XCTFail("no vertical splitter to drag")

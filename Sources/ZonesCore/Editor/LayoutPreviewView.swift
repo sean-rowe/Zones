@@ -12,10 +12,19 @@ public final class LayoutPreviewView: NSView {
     /// Called whenever a drag changes the layout.
     public var onLayoutChanged: ((ZoneLayout) -> Void)?
 
+    /// Called whenever the zone selection changes.
+    ///
+    /// Without this the controller only hears about layout changes, so the
+    /// Merge button — whose enabled state depends entirely on the selection —
+    /// never updates after the window is built.
+    public var onSelectionChanged: ((Set<UUID>) -> Void)?
+
     public var layout: ZoneLayout {
         didSet {
             splitters = LayoutEditing.splitters(in: layout)
             needsDisplay = true
+            // The dividers have moved, so the resize cursors must too.
+            window?.invalidateCursorRects(for: self)
         }
     }
 
@@ -24,12 +33,19 @@ public final class LayoutPreviewView: NSView {
     /// Without this the preview takes the window's shape and teaches the user a
     /// layout they did not build.
     public var targetAspectRatio: CGFloat {
-        didSet { needsDisplay = true }
+        didSet {
+            needsDisplay = true
+            window?.invalidateCursorRects(for: self)
+        }
     }
 
     /// Zone the user has selected, for split and merge.
     public var selectedZoneIDs: Set<UUID> = [] {
-        didSet { needsDisplay = true }
+        didSet {
+            guard selectedZoneIDs != oldValue else { return }
+            needsDisplay = true
+            onSelectionChanged?(selectedZoneIDs)
+        }
     }
 
     private var splitters: [Splitter] = []
@@ -54,6 +70,13 @@ public final class LayoutPreviewView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
     public override var isFlipped: Bool { false }
+
+    /// Cursor rects are in view coordinates, so resizing moves every divider
+    /// out from under its cursor unless they are rebuilt.
+    public override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        window?.invalidateCursorRects(for: self)
+    }
 
     // MARK: - Geometry
 

@@ -71,3 +71,20 @@ Feature: Layout editing
     Given the columns template with 2
     When I drag the vertical splitter to 0.6
     Then the layout origin is custom
+
+  Scenario: Two dividers at the same position but disjoint spans stay separate
+    Given a layout of two column pairs separated by a full-width band
+    Then there are 4 splitters
+    And there are 2 vertical splitters at 0.5
+
+  Scenario: Dragging one of two same-position dividers leaves the other alone
+    Given a layout of two column pairs separated by a full-width band
+    When I drag the upper vertical splitter to 0.8
+    Then the upper pair splits at 0.8
+    And the lower pair still splits at 0.5
+    And the zones tile the unit square exactly
+
+  Scenario: Zones stacked against one divider form a single grab area
+    Given the grid template with 2 rows and 2 columns
+    Then there is a vertical splitter at 0.5
+    And that vertical splitter spans the whole height
