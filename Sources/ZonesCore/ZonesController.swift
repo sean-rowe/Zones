@@ -14,6 +14,7 @@ public final class ZonesController {
     private var statusItem: NSStatusItem?
     private var permissionWindow: PermissionWindowController?
     private var onboarding: OnboardingWindowController?
+    private var editor: LayoutEditorWindowController?
 
     public init(permission: AccessibilityPermission = .shared,
                 settings: Settings = .shared,
@@ -70,6 +71,11 @@ public final class ZonesController {
         }
     }
 
+    // MARK: - Test seams
+
+    /// The status item menu, built exactly as `start()` builds it.
+    func menuForTesting() -> NSMenu { makeMenu() }
+
     // MARK: - Status item
 
     private func installStatusItem() {
@@ -89,7 +95,10 @@ public final class ZonesController {
         status.tag = Self.statusMenuItemTag
         menu.addItem(status)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Edit Layouts…", action: nil, keyEquivalent: ""))
+        let edit = NSMenuItem(title: "Edit Layout…", action: #selector(openEditor),
+                              keyEquivalent: "e")
+        edit.target = self
+        menu.addItem(edit)
         menu.addItem(NSMenuItem(title: "Settings…", action: nil, keyEquivalent: ","))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Zones",
@@ -153,6 +162,25 @@ public final class ZonesController {
             layouts.assign(layoutID: fallback.id, to: identity)
             ZonesLog.info("Zones", "assigned default layout to display \(identity.key)")
         }
+    }
+
+    @objc private func openEditor() {
+        // The display under the pointer is the one the user means — the editor
+        // previews at that display's proportions, so opening it for the wrong
+        // screen would show the wrong shape.
+        let pointer = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { $0.frame.contains(pointer) } ?? NSScreen.screens.first
+        guard let screen else { return }
+
+        let identity = DisplayIdentity.forScreen(screen)
+        let visible = screen.visibleFrame
+        let controller = LayoutEditorWindowController(
+            store: layouts,
+            display: identity,
+            targetAspectRatio: visible.height > 0 ? visible.width / visible.height : 16.0 / 9.0
+        )
+        editor = controller
+        controller.present()
     }
 
     @objc private func displayConfigurationDidSettle() {
