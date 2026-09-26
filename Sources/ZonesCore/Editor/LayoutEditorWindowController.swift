@@ -20,6 +20,7 @@ public final class LayoutEditorWindowController: NSWindowController, NSWindowDel
         didSet {
             preview?.layout = working
             nameField?.stringValue = working.name
+            syncTemplateControls()
             updateControls()
         }
     }
@@ -54,6 +55,7 @@ public final class LayoutEditorWindowController: NSWindowController, NSWindowDel
         super.init(window: window)
         window.delegate = self
         window.contentView = makeContentView(targetAspectRatio: targetAspectRatio)
+        syncTemplateControls()
         updateControls()
     }
 
@@ -97,6 +99,9 @@ public final class LayoutEditorWindowController: NSWindowController, NSWindowDel
         countLabel.textColor = .secondaryLabelColor
 
         nameField = NSTextField(string: working.name)
+        // Commits on every keystroke, so Save does not depend on the field's
+        // action having fired.
+        nameField.isContinuous = true
         nameField.placeholderString = "Layout name"
         nameField.target = self
         nameField.action = #selector(nameChanged)
@@ -153,6 +158,38 @@ public final class LayoutEditorWindowController: NSWindowController, NSWindowDel
 
     private var splitAxisControl: NSSegmentedControl!
 
+    /// Point the template pop-up and stepper at whatever `working` actually is.
+    ///
+    /// Two bugs live here if this is skipped. Opening the editor on a saved
+    /// three-column layout would show "Columns / 2", so the first stepper click
+    /// applies a two-column template and discards the layout. And after any
+    /// edit the origin becomes .custom while the pop-up still names the old
+    /// template, so a stepper click regenerates from it and wipes the edits.
+    private func syncTemplateControls() {
+        guard let templatePopUp, let countStepper else { return }
+        let (index, count) = Self.controlState(for: working)
+        templatePopUp.selectItem(at: index)
+        countStepper.integerValue = count
+    }
+
+    /// The pop-up index and stepper value that represent a layout.
+    static func controlState(for layout: ZoneLayout) -> (index: Int, count: Int) {
+        func index(of name: String) -> Int {
+            templates.firstIndex { $0.title == name } ?? templates.count - 1
+        }
+        switch layout.origin {
+        case .columns(let count):      return (index(of: "Columns"), count)
+        case .rows(let count):         return (index(of: "Rows"), count)
+        case .grid(let rows, _):       return (index(of: "Grid"), rows)
+        case .priorityGrid(let count): return (index(of: "Priority Grid"), count)
+        case .focus(let count):        return (index(of: "Focus"), count)
+        case .custom:
+            // Custom has no count to show, so report the zone count — it is at
+            // least honest about the size of what is on screen.
+            return (index(of: "Custom"), max(1, layout.zones.count))
+        }
+    }
+
     private func updateControls() {
         // Merge needs a selection that actually forms a rectangle, and saying so
         // by disabling the button is clearer than refusing the click later.
@@ -165,6 +202,8 @@ public final class LayoutEditorWindowController: NSWindowController, NSWindowDel
 
     /// The layout currently being edited.
     var workingLayoutForTesting: ZoneLayout { working }
+
+    static var templatesForTesting: [(title: String, origin: LayoutOrigin)] { templates }
 
     func saveForTesting() { save() }
     func duplicateForTesting() { duplicate() }
@@ -228,6 +267,12 @@ public final class LayoutEditorWindowController: NSWindowController, NSWindowDel
     }
 
     @objc private func save() {
+        // Read the field directly. NSTextField's action fires on Enter or when
+        // focus leaves, so typing a name and clicking Save straight afterwards
+        // would otherwise persist the old one.
+        if let nameField {
+            working.name = nameField.stringValue
+        }
         if working.name.trimmingCharacters(in: .whitespaces).isEmpty {
             working.name = "Untitled Layout"
         }

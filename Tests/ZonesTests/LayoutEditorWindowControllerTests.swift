@@ -75,6 +75,47 @@ final class LayoutEditorWindowControllerTests: XCTestCase {
         XCTAssertEqual(controller.workingLayoutForTesting.zones.count, 3)
     }
 
+    func testTheTemplateControlsOpenOnTheLayoutBeingEdited() {
+        // Opening on a saved three-column layout must not show "Columns / 2",
+        // or the first stepper click regenerates two columns and discards it.
+        let three = LayoutTemplate.columns(3)
+        store.save(three)
+        store.assign(layoutID: three.id, to: display)
+
+        let controller = LayoutEditorWindowController(store: store, display: display)
+        let state = LayoutEditorWindowController.controlState(
+            for: controller.workingLayoutForTesting)
+        XCTAssertEqual(state.count, 3)
+    }
+
+    func testAGridLayoutOpensWithItsOwnRowCount() {
+        let grid = LayoutTemplate.grid(rows: 3, columns: 3)
+        store.save(grid)
+        store.assign(layoutID: grid.id, to: display)
+
+        let controller = LayoutEditorWindowController(store: store, display: display)
+        XCTAssertEqual(
+            LayoutEditorWindowController.controlState(for: controller.workingLayoutForTesting).count,
+            3)
+    }
+
+    func testAnEditedLayoutReportsItselfAsCustom() {
+        // After an edit the origin is .custom, and the pop-up has to follow — a
+        // stepper click while it still named the old template would regenerate
+        // from that template and wipe the edits.
+        var edited = LayoutTemplate.columns(2)
+        let splitter = LayoutEditing.splitters(in: edited)[0]
+        edited = LayoutEditing.move(splitter, to: 0.7, in: edited)
+
+        let controller = LayoutEditorWindowController(store: store, display: display,
+                                                     editing: edited)
+        let state = LayoutEditorWindowController.controlState(
+            for: controller.workingLayoutForTesting)
+        let customIndex = LayoutEditorWindowController.templatesForTesting
+            .firstIndex { $0.title == "Custom" }
+        XCTAssertEqual(state.index, customIndex)
+    }
+
     func testDeletingRemovesTheLayoutAndReassignsTheDisplay() {
         let keep = LayoutTemplate.columns(2)
         let doomed = LayoutTemplate.rows(3)
