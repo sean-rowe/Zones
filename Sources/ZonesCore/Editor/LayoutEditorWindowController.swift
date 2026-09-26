@@ -90,11 +90,14 @@ public final class LayoutEditorWindowController: NSWindowController, NSWindowDel
         countStepper = NSStepper()
         countStepper.minValue = 1
         countStepper.maxValue = 12
-        countStepper.integerValue = 2
         countStepper.target = self
         countStepper.action = #selector(countChanged)
+        // No initial value here: syncTemplateControls() sets both this and the
+        // pop-up from `working` once the views exist. A literal default would be
+        // dead code that reads like the bug where the controls ignored the
+        // layout being edited.
 
-        countLabel = NSTextField(labelWithString: "2 zones")
+        countLabel = NSTextField(labelWithString: "")
         countLabel.font = .systemFont(ofSize: 11)
         countLabel.textColor = .secondaryLabelColor
 
