@@ -7,9 +7,17 @@ let package = Package(
     products: [
         .library(name: "ZonesCore", targets: ["ZonesCore"]),
     ],
+    dependencies: [
+        // The one external dependency: auto-update. Everything else is system
+        // frameworks.
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
+    ],
     targets: [
         .target(
             name: "ZonesCore",
+            dependencies: [
+                .product(name: "Sparkle", package: "Sparkle"),
+            ],
             path: "Sources/ZonesCore",
             linkerSettings: [
                 .linkedFramework("AppKit"),

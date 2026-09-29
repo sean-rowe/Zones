@@ -2,30 +2,61 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>Zones</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.pinyridgelabs.Zones</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>Zones</string>
 	<key>CFBundleDisplayName</key>
 	<string>Zones</string>
-	<key>CFBundleIdentifier</key>
-	<string>com.pinyridgelabs.Zones</string>
-	<key>CFBundleExecutable</key>
-	<string>Zones</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>__SHORT_VERSION__</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>__BUILD_VERSION__</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
 	<!-- Menu bar only: no Dock icon, and the app never takes focus on launch. -->
 	<key>LSUIElement</key>
 	<true/>
-	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © Piny Ridge Labs</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 Pinyridge Labs. All rights reserved.</string>
+	<!-- Sparkle auto-update: feed and images served from Firebase Hosting on
+	     the company domain. The public key's private half lives in the
+	     release machine's keychain (generate_keys). -->
+	<key>SUFeedURL</key>
+	<string>https://zones.pinyridgelabs.com/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>nQE0JanV+AvB3k7TMd22frS4go3LnM1Upj6FYZrcC3c=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<!-- zones://activate?key=… — the thanks page's one-click activation. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.pinyridgelabs.Zones.activation</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>zones</string>
+			</array>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -234,10 +234,14 @@ fetches artifacts from a GitHub Release and refuses to deploy an incomplete set.
 **Zones should be born with that split**, not grow into it.
 
 Licensing and trial (`LicenseStore`, `TrialManager`, `TrialReminder`) port from
-Tack against a `zones.pinyridgelabs.com` equivalent. Note Tack's warning: the
-API host and appcast URL are compiled into every shipped binary, and an
-installed copy can never be told a new address. Decide those URLs once, before
-the first public build.
+Tack against `zones.pinyridgelabs.com`.
+The final agreed hostnames are fixed as:
+- **API Base**: `https://zones.pinyridgelabs.com/api/licenses`
+- **Checkout URL**: `https://zones.pinyridgelabs.com/#pricing`
+- **Appcast URL**: `https://zones.pinyridgelabs.com/appcast.xml`
+- **URL Scheme**: `zones://activate?key=…`
+
+These hostnames are compiled into the binary (`ZonesStoreConfig`) and must remain permanent.
 
 ---
 
