@@ -220,3 +220,23 @@ final class DragMonitorTests: XCTestCase {
         XCTAssertNil(endedShouldSnap, "Window in full-screen Space must not trigger drag snap")
     }
 }
+
+extension DragMonitorTests {
+    /// The full-screen check is an Accessibility round trip into the dragged
+    /// app. Made per mouse event it stuttered app-driven drags, and with them
+    /// any Tack strip following the window.
+    func testFullScreenSpaceIsCheckedOncePerDragNotPerMouseEvent() {
+        var checks = 0
+        monitor.isFullScreenSpace = { _ in checks += 1; return false }
+
+        monitor.handleMouseDown(at: CGPoint(x: 200, y: 120))
+        for step in 1...20 {
+            monitor.handleMouseDragged(at: CGPoint(x: 200 + step * 5, y: 120 + step * 3),
+                                       flags: [.maskShift])
+        }
+        monitor.handleFlagsChanged(flags: [])
+        monitor.handleMouseUp(at: CGPoint(x: 300, y: 180), flags: [.maskShift])
+
+        XCTAssertEqual(checks, 1)
+    }
+}
