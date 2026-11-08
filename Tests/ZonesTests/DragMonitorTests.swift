@@ -239,4 +239,28 @@ extension DragMonitorTests {
 
         XCTAssertEqual(checks, 1)
     }
+
+    /// A press in the window body (testWindow spans y 100–700, title bar to
+    /// y 140) becomes a drag once the app moves the window itself.
+    private func dragCandidateWindow(fullScreen: Bool?) -> Int {
+        var checks = 0
+        monitor.isFullScreenSpace = { _ in checks += 1; return fullScreen }
+        var origin = CGPoint(x: 100, y: 100)
+        monitor.windowOrigin = { _ in origin }
+
+        monitor.handleMouseDown(at: CGPoint(x: 400, y: 400))
+        origin = CGPoint(x: 140, y: 130)
+        monitor.handleMouseDragged(at: CGPoint(x: 440, y: 430), flags: [.maskShift])
+        monitor.handleMouseDragged(at: CGPoint(x: 460, y: 450), flags: [.maskShift])
+        monitor.handleMouseUp(at: CGPoint(x: 460, y: 450), flags: [.maskShift])
+        return checks
+    }
+
+    func testCandidateDragReusesADefiniteFullScreenAnswer() {
+        XCTAssertEqual(dragCandidateWindow(fullScreen: false), 1)
+    }
+
+    func testCandidateDragRechecksWhenTheFirstLookupWasInconclusive() {
+        XCTAssertEqual(dragCandidateWindow(fullScreen: nil), 2)
+    }
 }
