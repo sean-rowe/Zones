@@ -236,6 +236,11 @@ final class ZoneEditorCanvas: NSView {
     }
 
     func setGap(_ value: Double) {
+        // "nan" parses as a Double; converting it to Int for the field would trap.
+        guard !value.isNaN else {
+            gapField.stringValue = "\(Int(gap))"
+            return
+        }
         gap = min(max(value, Self.gapRange.lowerBound), Self.gapRange.upperBound)
     }
 

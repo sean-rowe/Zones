@@ -115,6 +115,25 @@ final class ZoneEditorTests: XCTestCase {
         XCTAssertEqual(rects[1].minX, 804, accuracy: 0.5)
     }
 
+    func testHorizontalSplitPutsZoneOneOnTop() {
+        settings.update { $0.outerPadding = 0 }
+        let (_, canvas) = editor()
+        canvas.setGap(0)
+        canvas.press(at: CGPoint(x: 0.5, y: 0.25), shift: true)
+        let rects = canvas.resolvedZoneRects()
+        // AppKit is Y-up: the top zone sits at the top of the view.
+        XCTAssertEqual(rects[0].height, 225, accuracy: 0.5)
+        XCTAssertEqual(rects[0].maxY, 900, accuracy: 0.5)
+        XCTAssertEqual(rects[1].minY, 0, accuracy: 0.5)
+    }
+
+    func testNaNGapIsIgnored() {
+        let (_, canvas) = editor()
+        canvas.setGap(10)
+        canvas.setGap(.nan)
+        XCTAssertEqual(canvas.gap, 10)
+    }
+
     /// Writes PNGs of the editor over a desktop-like backdrop when
     /// ZONES_EDITOR_SNAPSHOT_DIR is set, for checking against PineOS.
     func testRenderSnapshots() throws {

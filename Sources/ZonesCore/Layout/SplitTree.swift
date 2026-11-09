@@ -194,10 +194,10 @@ public indirect enum SplitTree: Equatable, Sendable {
 
     /// Merge the leaf under a point into its sibling. The last zone stays.
     public func merging(at p: CGPoint) -> SplitTree? {
-        guard let hit = leaf(at: p), !hit.path.isEmpty else { return nil }
+        guard let hit = leaf(at: p), let isSecond = hit.path.last else { return nil }
         let parentPath = Array(hit.path.dropLast())
         guard case let .split(_, _, first, second)? = node(at: parentPath) else { return nil }
-        let sibling = hit.path.last! ? first : second
+        let sibling = isSecond ? first : second
         return replacing(at: parentPath, with: sibling)
     }
 
