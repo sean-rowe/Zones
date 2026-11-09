@@ -197,42 +197,17 @@ public enum LayoutEditing {
     public static func split(zoneID: UUID, axis: SplitterAxis,
                              in layout: ZoneLayout) -> ZoneLayout {
         guard let target = layout.zones.first(where: { $0.id == zoneID }) else { return layout }
-        let mid = axis == .vertical ? target.rect.midX : target.rect.midY
-        // Halving keeps its original behaviour and never checks the minimum;
-        // only a cut at an arbitrary position can produce a sliver.
-        return cut(target, axis: axis, at: mid, in: layout)
-    }
-
-    /// Replace a zone with two parts, divided at a normalized position.
-    ///
-    /// The position is on the perpendicular axis, as for `Splitter`: x for a
-    /// vertical cut, y for a horizontal one. A cut that would leave either part
-    /// below the minimum size returns the layout unchanged — the grid editor
-    /// clamps its preview line first, so in practice this only refuses a zone
-    /// that is too small to split at all.
-    public static func split(zoneID: UUID, axis: SplitterAxis, at position: Double,
-                             in layout: ZoneLayout) -> ZoneLayout {
-        guard let target = layout.zones.first(where: { $0.id == zoneID }) else { return layout }
-        let rect = target.rect
-        let lower = Double(axis == .vertical ? rect.minX : rect.minY)
-        let upper = Double(axis == .vertical ? rect.maxX : rect.maxY)
-        guard position - lower >= minimumZoneFraction - epsilon,
-              upper - position >= minimumZoneFraction - epsilon else { return layout }
-        return cut(target, axis: axis, at: CGFloat(position), in: layout)
-    }
-
-    private static func cut(_ target: Zone, axis: SplitterAxis, at cut: CGFloat,
-                            in layout: ZoneLayout) -> ZoneLayout {
-        let zoneID = target.id
         let rect = target.rect
         let halves: [CGRect]
         switch axis {
         case .vertical:
-            halves = [CGRect(x: rect.minX, y: rect.minY, width: cut - rect.minX, height: rect.height),
-                      CGRect(x: cut, y: rect.minY, width: rect.maxX - cut, height: rect.height)]
+            let mid = rect.midX
+            halves = [CGRect(x: rect.minX, y: rect.minY, width: mid - rect.minX, height: rect.height),
+                      CGRect(x: mid, y: rect.minY, width: rect.maxX - mid, height: rect.height)]
         case .horizontal:
-            halves = [CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: cut - rect.minY),
-                      CGRect(x: rect.minX, y: cut, width: rect.width, height: rect.maxY - cut)]
+            let mid = rect.midY
+            halves = [CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: mid - rect.minY),
+                      CGRect(x: rect.minX, y: mid, width: rect.width, height: rect.maxY - mid)]
         }
 
         var zones: [Zone] = []

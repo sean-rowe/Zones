@@ -124,23 +124,4 @@ public enum LayoutOrigin: Codable, Equatable, Sendable {
     case grid(rows: Int, columns: Int)
     case priorityGrid(count: Int)
     case focus(count: Int)
-    /// Free-form zones placed by hand in the canvas editor.
-    ///
-    /// Distinct from `.custom` because the two editors cannot share a layout:
-    /// the grid editor assumes zones tile the display exactly, and canvas zones
-    /// are free to overlap or leave holes. Inferring the editor from the
-    /// geometry instead would send a canvas layout that happens to tile into
-    /// the grid editor, which then refuses the next overlapping move.
-    case canvas
-    /// Deliberately no zones — FancyZones' "No layout".
-    ///
-    /// Stored as a real, empty layout rather than as a missing assignment,
-    /// because a display with no assignment is treated as new and given the
-    /// default layout the next time the display configuration settles.
-    case blank
-}
-
-public extension LayoutOrigin {
-    /// Whether the layout is edited as free-form rects rather than a tiling.
-    var isCanvas: Bool { self == .canvas }
 }

@@ -6,10 +6,7 @@ import Foundation
 /// layouts a user hand-built after an unversioned format changed shape is not
 /// possible at all.
 struct LayoutArchive: Codable {
-    /// 2 added the `.canvas` and `.blank` layout origins. An older Zones
-    /// cannot decode those, so it must see a newer version and go read-only
-    /// rather than treat the archive as corrupt and overwrite it.
-    static let currentVersion = 2
+    static let currentVersion = 1
 
     var version: Int = LayoutArchive.currentVersion
     var layouts: [ZoneLayout] = []
