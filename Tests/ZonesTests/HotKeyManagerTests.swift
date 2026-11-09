@@ -116,3 +116,27 @@ final class HotKeyManagerTests: XCTestCase {
         }
     }
 }
+
+extension HotKeyManagerTests {
+    func testControlOptionCommandGraveOpensTheEditor() {
+        var opened = 0
+        manager.onOpenEditor = { opened += 1 }
+        let handled = manager.handleKeyEvent(makeKeyEvent(keyCode: 50, modifiers: [.control, .option, .command]))
+        XCTAssertTrue(handled)
+        XCTAssertEqual(opened, 1)
+        XCTAssertTrue(snappedFrames.isEmpty, "opening the editor must not move a window")
+    }
+
+    func testGraveWithoutTheZonesModifiersIsLeftToTheApp() {
+        var opened = 0
+        manager.onOpenEditor = { opened += 1 }
+        // ⌘` is the system's own "next window of this app".
+        XCTAssertFalse(manager.handleKeyEvent(makeKeyEvent(keyCode: 50, modifiers: [.command])))
+        XCTAssertEqual(opened, 0)
+    }
+
+    func testGraveIsNotSwallowedWhenNothingOpensTheEditor() {
+        manager.onOpenEditor = nil
+        XCTAssertFalse(manager.handleKeyEvent(makeKeyEvent(keyCode: 50, modifiers: [.control, .option, .command])))
+    }
+}

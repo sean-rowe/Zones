@@ -68,3 +68,21 @@ final class ZonesControllerMenuTests: XCTestCase {
         XCTAssertFalse(menu.items[0].isEnabled, "the status line is a label, not an action")
     }
 }
+
+extension ZonesControllerMenuTests {
+    func testAPlainClickOnTheIconOpensTheEditor() {
+        XCTAssertFalse(ZonesController.statusClickOpensMenu(type: .leftMouseUp, modifiers: []))
+    }
+
+    func testARightOrControlClickOnTheIconShowsTheMenu() {
+        XCTAssertTrue(ZonesController.statusClickOpensMenu(type: .rightMouseUp, modifiers: []))
+        XCTAssertTrue(ZonesController.statusClickOpensMenu(type: .leftMouseUp, modifiers: [.control]))
+    }
+
+    func testTheEditorItemShowsTheGlobalShortcut() {
+        let menu = controller(trusted: true).menuForTesting()
+        let item = menu.items.first { $0.title.hasPrefix("Edit Layout") }
+        XCTAssertEqual(item?.keyEquivalent, "`")
+        XCTAssertEqual(item?.keyEquivalentModifierMask, [.control, .option, .command])
+    }
+}
