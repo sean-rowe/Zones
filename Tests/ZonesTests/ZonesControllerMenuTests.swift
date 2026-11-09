@@ -86,3 +86,32 @@ extension ZonesControllerMenuTests {
         XCTAssertEqual(item?.keyEquivalentModifierMask, [.control, .option, .command])
     }
 }
+
+extension ZonesControllerMenuTests {
+    private func clicks(type: NSEvent.EventType?, modifiers: NSEvent.ModifierFlags) -> (editor: Int, menu: Int) {
+        let zones = controller(trusted: true)
+        var editor = 0, menu = 0
+        zones.openEditorOverride = { editor += 1 }
+        zones.showMenuOverride = { menu += 1 }
+        zones.handleStatusClick(type: type, modifiers: modifiers)
+        return (editor, menu)
+    }
+
+    func testAPlainClickRoutesToTheEditor() {
+        let result = clicks(type: .leftMouseUp, modifiers: [])
+        XCTAssertEqual(result.editor, 1)
+        XCTAssertEqual(result.menu, 0)
+    }
+
+    func testARightClickRoutesToTheMenu() {
+        let result = clicks(type: .rightMouseUp, modifiers: [])
+        XCTAssertEqual(result.editor, 0)
+        XCTAssertEqual(result.menu, 1)
+    }
+
+    func testAControlClickRoutesToTheMenu() {
+        let result = clicks(type: .leftMouseUp, modifiers: [.control])
+        XCTAssertEqual(result.editor, 0)
+        XCTAssertEqual(result.menu, 1)
+    }
+}

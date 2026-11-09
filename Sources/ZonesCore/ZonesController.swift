@@ -173,12 +173,23 @@ public final class ZonesController {
 
     @objc private func statusItemClicked(_ sender: Any?) {
         let event = NSApp.currentEvent
-        if Self.statusClickOpensMenu(type: event?.type, modifiers: event?.modifierFlags ?? []) {
-            showStatusMenu()
+        handleStatusClick(type: event?.type, modifiers: event?.modifierFlags ?? [])
+    }
+
+    /// Routes one click on the icon. Split from the `@objc` action so tests can
+    /// drive it without a real mouse event.
+    func handleStatusClick(type: NSEvent.EventType?, modifiers: NSEvent.ModifierFlags) {
+        if Self.statusClickOpensMenu(type: type, modifiers: modifiers) {
+            (showMenuOverride ?? showStatusMenu)()
         } else {
-            openEditor()
+            (openEditorOverride ?? openEditor)()
         }
     }
+
+    /// Test seams: stand in for the editor and the menu, which would otherwise
+    /// open real windows.
+    var openEditorOverride: (() -> Void)?
+    var showMenuOverride: (() -> Void)?
 
     private func showStatusMenu() {
         guard let item = statusItem, let button = item.button else { return }
