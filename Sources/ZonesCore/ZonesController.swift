@@ -26,6 +26,7 @@ public final class ZonesController {
     private var permissionWindow: PermissionWindowController?
     private var onboarding: OnboardingWindowController?
     private var editor: ZoneEditor?
+    let trialExpiredNotice = TrialExpiredNotice()
 
     public init(permission: AccessibilityPermission = .shared,
                 settings: Settings = .shared,
@@ -97,11 +98,34 @@ public final class ZonesController {
             object: nil
         )
 
+        // Trial reminders: at launch, when the day rolls over, and on wake —
+        // a Mac that sleeps through midnight never sees the day change.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(checkTrialReminders),
+            name: .NSCalendarDayChanged, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(checkTrialReminders),
+            name: NSWorkspace.didWakeNotification, object: nil)
+        checkTrialReminders()
+
         let onboarding = OnboardingWindowController()
         self.onboarding = onboarding
         onboarding.presentIfNeeded { [weak self] in
             self?.resolvePermission()
         }
+    }
+
+    /// Tell a trial user where the clock stands, once per milestone.
+    @objc private func checkTrialReminders() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.trialReminderPoster(self.trialManager.state)
+        }
+    }
+
+    /// Seam: tests record the states instead of posting notifications.
+    var trialReminderPoster: (LicenseState) -> Void = { state in
+        TrialReminder.deliverIfNeeded(state: state)
     }
 
     private func resolvePermission() {
@@ -323,10 +347,15 @@ public final class ZonesController {
         windowRestorer.start()
 
         ZonesLog.info("Zones", "accessibility granted; window management active")
+        if !trialManager.canSnap {
+            // Otherwise the only symptom is drags that do nothing.
+            ZonesLog.info("Zones", "trial expired and no license; drag snapping is off")
+        }
     }
 
     private func setupDragHandling() {
         dragMonitor.onDragStarted = { [weak self] _, _ in
+            self?.trialExpiredNotice.dragBegan()
             guard let self = self, self.trialManager.canSnap else { return }
             let assigned = self.currentAssignedLayouts()
             self.overlayManager.show(layouts: assigned)
@@ -336,6 +365,7 @@ public final class ZonesController {
             guard let self = self else { return }
             guard self.trialManager.canSnap else {
                 self.overlayManager.hide()
+                self.trialExpiredNotice.dragBlocked(isActivated: isActivated, at: location)
                 return
             }
             if isActivated {

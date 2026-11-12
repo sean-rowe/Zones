@@ -35,11 +35,24 @@ public final class TrialManager {
     /// Answered by the license store's remembered activation.
     public var isLicensed: () -> Bool = { LicenseStore.shared.isActivated }
 
+    /// Development builds never run out of trial: the anchor lives in the
+    /// keychain, shared with the installed app, so the machine Zones is built
+    /// on is the first one to expire — and an expired trial drops every drag
+    /// without a word. Compiled out of release builds, so nothing shipped
+    /// carries the exemption; off under XCTest so the clock stays testable.
+    public var isDevelopmentBuild: () -> Bool = {
+        #if DEBUG
+        return NSClassFromString("XCTestCase") == nil
+        #else
+        return false
+        #endif
+    }
+
     public init() {}
 
     /// The current state, establishing the anchor on first use.
     public var state: LicenseState {
-        if isLicensed() { return .licensed }
+        if isLicensed() || isDevelopmentBuild() { return .licensed }
         let anchor = establishedAnchor()
         let counted = max(0, Calendar.current.dateComponents([.day], from: anchor, to: now()).day ?? 0)
         let used = daysUsed(atLeast: counted)
