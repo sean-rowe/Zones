@@ -38,8 +38,10 @@ public class DragMonitor {
     }
 
     /// Seam for detecting whether a window is in a full-screen Space.
-    public var isFullScreenSpace: (WindowInfo) -> Bool = { window in
-        guard let axElement = WindowMatcher().findAXElement(for: window) else { return false }
+    /// Returns nil when the window's Accessibility element can't be found,
+    /// so a later event can try again instead of trusting a guess.
+    public var isFullScreenSpace: (WindowInfo) -> Bool? = { window in
+        guard let axElement = WindowMatcher().findAXElement(for: window) else { return nil }
         return AccessibilityElement(axElement).isFullScreen
     }
 
@@ -52,6 +54,9 @@ public class DragMonitor {
     private var dragStartPos: CGPoint = .zero
     private var candidateWindow: WindowInfo?
     private var candidateOrigin: CGPoint = .zero
+    /// Whether mouse-down already got a definite full-screen answer for the
+    /// candidate, so the drag doesn't repeat the Accessibility lookup.
+    private var candidateFullScreenChecked = false
     private var isCancelled = false
     private var secondaryClickToggled = false
     private var windowSnapshot: [WindowInfo] = []
@@ -154,7 +159,8 @@ public class DragMonitor {
 
         guard let clicked = windowSnapshot.first(where: { $0.bounds.contains(location) }) else { return }
 
-        if isFullScreenSpace(clicked) {
+        let fullScreen = isFullScreenSpace(clicked)
+        if fullScreen == true {
             ZonesLog.info("Drag", "Declined drag for window in full-screen Space: \(clicked.displayName)")
             return
         }
@@ -170,13 +176,14 @@ public class DragMonitor {
             beginPotentialDrag(of: clicked)
         } else {
             candidateWindow = clicked
+            candidateFullScreenChecked = fullScreen != nil
             candidateOrigin = windowOrigin(clicked.windowID) ?? clicked.bounds.origin
         }
     }
 
     public func handleMouseDragged(at location: CGPoint, flags: CGEventFlags) {
         if !potentialDrag, let candidate = candidateWindow, candidateHasMoved() {
-            if isFullScreenSpace(candidate) {
+            if !candidateFullScreenChecked, isFullScreenSpace(candidate) == true {
                 candidateWindow = nil
                 return
             }
@@ -204,7 +211,6 @@ public class DragMonitor {
         defer { resetDrag() }
 
         guard isDragging, !isCancelled, let window = draggedWindow else { return }
-        if isFullScreenSpace(window) { return }
 
         let active = isZoneActive(flags: flags)
         let span = isSpanModifierHeld(flags: flags)
@@ -250,10 +256,15 @@ public class DragMonitor {
             || abs(now.y - candidateOrigin.y) > windowMoveThreshold
     }
 
+    /// The full-screen check is made once, when the press becomes a drag
+    /// (`handleMouseDown` and the candidate path in `handleMouseDragged`); a
+    /// window cannot change Space mid-drag. It used to be repeated here, on
+    /// every mouse event: a full Accessibility round trip into the dragged
+    /// application — list its windows, read AXFullScreen — at the mouse's
+    /// event rate. Apps that move their own windows (Chromium, Electron) answer
+    /// those on the same thread that moves the window, so the window stuttered
+    /// and anything following it, such as a Tack tab strip, bounced.
     private func isZoneActive(flags: CGEventFlags) -> Bool {
-        if let window = draggedWindow, isFullScreenSpace(window) {
-            return false
-        }
         let settings = Settings.shared.current
         if secondaryClickToggled {
             return true
@@ -290,6 +301,7 @@ public class DragMonitor {
         potentialDrag = false
         draggedWindow = nil
         candidateWindow = nil
+        candidateFullScreenChecked = false
         isCancelled = false
         secondaryClickToggled = false
         windowSnapshot = []

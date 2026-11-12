@@ -25,7 +25,7 @@ public final class ZonesController {
     private var statusItem: NSStatusItem?
     private var permissionWindow: PermissionWindowController?
     private var onboarding: OnboardingWindowController?
-    private var editor: LayoutEditorWindowController?
+    private var editor: ZoneEditor?
 
     public init(permission: AccessibilityPermission = .shared,
                 settings: Settings = .shared,
@@ -404,25 +404,15 @@ public final class ZonesController {
     }
 
     @objc private func openEditor() {
-        // A second click or keypress brings the open editor forward rather
-        // than stacking another one over it.
-        if let editor, editor.window?.isVisible == true {
-            editor.present()
-            return
+        if editor == nil {
+            let editor = ZoneEditor(store: layouts, settings: settings)
+            editor.onApply = { [weak self] _, _ in
+                guard let self, self.settings.current.flashZonesOnLayoutSwitch else { return }
+                self.overlayManager.flashZones(layouts: self.currentAssignedLayouts())
+            }
+            self.editor = editor
         }
-        let pointer = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { $0.frame.contains(pointer) } ?? NSScreen.screens.first
-        guard let screen else { return }
-
-        let identity = DisplayIdentity.forScreen(screen)
-        let visible = screen.visibleFrame
-        let controller = LayoutEditorWindowController(
-            store: layouts,
-            display: identity,
-            targetAspectRatio: visible.height > 0 ? visible.width / visible.height : 16.0 / 9.0
-        )
-        editor = controller
-        controller.present()
+        editor?.present()
     }
 
     @objc private func displayConfigurationDidSettle() {
