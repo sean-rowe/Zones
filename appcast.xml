@@ -3,6 +3,23 @@
     <channel>
         <title>Zones</title>
         <item>
+            <title>0.1.1</title>
+            <pubDate>Thu, 12 Nov 2026 15:44:44 -0600</pubDate>
+            <sparkle:version>38</sparkle:version>
+            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<h2>Zones 0.1.1</h2>
+<ul>
+  <li>When the trial has ended, dragging a window with the zone modifier held now shows a short banner explaining that snapping is off, instead of doing nothing.</li>
+  <li>Trial reminders are now sent: three days left, one day left, and when the trial ends.</li>
+</ul>
+]]></description>
+            <enclosure url="https://zones.pinyridgelabs.com/Zones-0.1.1.dmg" length="1995212" type="application/octet-stream" sparkle:edSignature="098S1Q7yZLzJMSW3dfo7ysaeoHoAFeQeUeQtZvybKgXx5qiD4pniEWI4XmXD7SSRJxug4j757SXEv1JNZ3l7AQ=="/>
+            <sparkle:deltas>
+                <enclosure url="https://zones.pinyridgelabs.com/Zones38-32.delta" sparkle:deltaFrom="32" length="173710" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="976432" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="YC7w7+Xn1fuwGD+WRQQK1B9VRLocLP8FBvbUQVGNho+mc8z5sGrWNT+nxZhgo5UlKFSprVnKA0PLOB9FCghyCw=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.1.0</title>
             <pubDate>Wed, 11 Nov 2026 22:02:04 -0600</pubDate>
             <sparkle:version>32</sparkle:version>
