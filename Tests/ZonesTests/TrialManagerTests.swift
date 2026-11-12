@@ -142,6 +142,49 @@ final class TrialManagerTests: XCTestCase {
         XCTAssertNil(notice.panel, "the banner dismisses itself")
     }
 
+    func testReminderIsDeliveredOncePerMilestone() {
+        var posted: [TrialReminder.Moment] = []
+        let post: TrialReminder.Poster = { moment, done in posted.append(moment); done(true) }
+
+        TrialReminder.deliverIfNeeded(state: .trial(daysRemaining: 10), defaults: defaults, post: post)
+        XCTAssertEqual(posted, [], "nothing to say with ten days left")
+
+        TrialReminder.deliverIfNeeded(state: .trial(daysRemaining: 3), defaults: defaults, post: post)
+        TrialReminder.deliverIfNeeded(state: .trial(daysRemaining: 2), defaults: defaults, post: post)
+        XCTAssertEqual(posted, [.threeDaysLeft])
+
+        TrialReminder.deliverIfNeeded(state: .trialExpired, defaults: defaults, post: post)
+        TrialReminder.deliverIfNeeded(state: .trialExpired, defaults: defaults, post: post)
+        XCTAssertEqual(posted, [.threeDaysLeft, .expired])
+
+        TrialReminder.deliverIfNeeded(state: .licensed, defaults: defaults, post: post)
+        XCTAssertEqual(posted.count, 2)
+    }
+
+    func testReminderThatCouldNotBePostedIsOfferedAgain() {
+        var attempts = 0
+        var allowed = false
+        let post: TrialReminder.Poster = { _, done in attempts += 1; done(allowed) }
+
+        TrialReminder.deliverIfNeeded(state: .trialExpired, defaults: defaults, post: post)
+        TrialReminder.deliverIfNeeded(state: .trialExpired, defaults: defaults, post: post)
+        XCTAssertEqual(attempts, 2, "a refused reminder is not marked as sent")
+
+        allowed = true
+        TrialReminder.deliverIfNeeded(state: .trialExpired, defaults: defaults, post: post)
+        TrialReminder.deliverIfNeeded(state: .trialExpired, defaults: defaults, post: post)
+        XCTAssertEqual(attempts, 3)
+    }
+
+    func testRealPosterDeclinesUnderTests() {
+        let declined = expectation(description: "declined")
+        TrialReminder.postNotification(.expired) { delivered in
+            XCTAssertFalse(delivered)
+            declined.fulfill()
+        }
+        wait(for: [declined], timeout: 1)
+    }
+
     func testTrialReminderMilestones() {
         XCTAssertNil(TrialReminder.moment(for: .licensed))
         XCTAssertNil(TrialReminder.moment(for: .trial(daysRemaining: 10)))

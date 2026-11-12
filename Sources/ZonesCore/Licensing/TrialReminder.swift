@@ -53,30 +53,61 @@ public enum TrialReminder {
         !alreadySent.contains(moment.rawValue)
     }
 
+    /// Posts one moment and reports whether it reached the user.
+    public typealias Poster = (Moment, @escaping (Bool) -> Void) -> Void
+
     /// Check the state and post a notification if a moment has arrived and has
-    /// not been delivered before.
+    /// not been delivered before. A moment counts as delivered only once it
+    /// was actually posted, so one refused while notifications are off is
+    /// offered again on a later check instead of being lost.
     public static func deliverIfNeeded(
         state: LicenseState,
         defaults: UserDefaults = .standard,
-        notificationCenter: UNUserNotificationCenter = .current()
+        post: Poster = TrialReminder.postNotification
     ) {
         guard let moment = moment(for: state) else { return }
-        var sent = Set(defaults.stringArray(forKey: sentKey) ?? [])
+        let sent = Set(defaults.stringArray(forKey: sentKey) ?? [])
         guard shouldDeliver(moment, alreadySent: sent) else { return }
 
-        let content = UNMutableNotificationContent()
-        content.title = moment.title
-        content.body = moment.body
-        content.sound = .default
+        post(moment) { delivered in
+            guard delivered else {
+                ZonesLog.info("Trial", "reminder \(moment.rawValue) not delivered; will try again")
+                return
+            }
+            var sent = Set(defaults.stringArray(forKey: sentKey) ?? [])
+            sent.insert(moment.rawValue)
+            defaults.set(Array(sent), forKey: sentKey)
+            ZonesLog.info("Trial", "reminder \(moment.rawValue) delivered")
+        }
+    }
 
-        let request = UNNotificationRequest(
-            identifier: "com.pinyridgelabs.Zones.\(moment.rawValue)",
-            content: content,
-            trigger: nil
-        )
+    /// The real poster: asks for permission the first time a reminder is due,
+    /// never earlier, then posts it.
+    public static func postNotification(_ moment: Moment, completion: @escaping (Bool) -> Void) {
+        // The notification centre needs a bundle; a test runner has none.
+        guard NSClassFromString("XCTestCase") == nil, Bundle.main.bundleIdentifier != nil else {
+            completion(false)
+            return
+        }
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else {
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+            let content = UNMutableNotificationContent()
+            content.title = moment.title
+            content.body = moment.body
+            content.sound = .default
 
-        notificationCenter.add(request) { _ in }
-        sent.insert(moment.rawValue)
-        defaults.set(Array(sent), forKey: sentKey)
+            let request = UNNotificationRequest(
+                identifier: "com.pinyridgelabs.Zones.\(moment.rawValue)",
+                content: content,
+                trigger: nil
+            )
+            center.add(request) { error in
+                DispatchQueue.main.async { completion(error == nil) }
+            }
+        }
     }
 }
