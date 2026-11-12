@@ -26,6 +26,7 @@ public final class ZonesController {
     private var permissionWindow: PermissionWindowController?
     private var onboarding: OnboardingWindowController?
     private var editor: ZoneEditor?
+    let trialExpiredNotice = TrialExpiredNotice()
 
     public init(permission: AccessibilityPermission = .shared,
                 settings: Settings = .shared,
@@ -331,6 +332,7 @@ public final class ZonesController {
 
     private func setupDragHandling() {
         dragMonitor.onDragStarted = { [weak self] _, _ in
+            self?.trialExpiredNotice.dragBegan()
             guard let self = self, self.trialManager.canSnap else { return }
             let assigned = self.currentAssignedLayouts()
             self.overlayManager.show(layouts: assigned)
@@ -340,6 +342,7 @@ public final class ZonesController {
             guard let self = self else { return }
             guard self.trialManager.canSnap else {
                 self.overlayManager.hide()
+                self.trialExpiredNotice.dragBlocked(isActivated: isActivated, at: location)
                 return
             }
             if isActivated {

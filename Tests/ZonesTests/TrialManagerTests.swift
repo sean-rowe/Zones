@@ -98,6 +98,50 @@ final class TrialManagerTests: XCTestCase {
         XCTAssertFalse(TrialManager().isDevelopmentBuild())
     }
 
+    func testExpiredNoticeShowsOncePerDragAndOnlyWhenZonesAreAskedFor() {
+        let notice = TrialExpiredNotice()
+        var shown = 0
+        notice.present = { _ in shown += 1 }
+
+        notice.dragBegan()
+        XCTAssertFalse(notice.dragBlocked(isActivated: false, at: .zero))
+        XCTAssertEqual(shown, 0, "a plain drag is not a request for zones")
+
+        XCTAssertTrue(notice.dragBlocked(isActivated: true, at: .zero))
+        XCTAssertFalse(notice.dragBlocked(isActivated: true, at: .zero))
+        XCTAssertEqual(shown, 1)
+
+        notice.dragBegan()
+        XCTAssertTrue(notice.dragBlocked(isActivated: true, at: .zero))
+        XCTAssertEqual(shown, 2)
+    }
+
+    /// Opt-in: puts the real banner on the main display for a moment.
+    func testExpiredNoticeBannerOnARealScreen() throws {
+        guard let dir = ProcessInfo.processInfo.environment["ZONES_NOTICE_SNAPSHOT_DIR"] else {
+            throw XCTSkip("set ZONES_NOTICE_SNAPSHOT_DIR to render the banner")
+        }
+        let screen = try XCTUnwrap(NSScreen.screens.first)
+        let notice = TrialExpiredNotice()
+        notice.displayDuration = 0.5
+        notice.dragBegan()
+        let cgPoint = CGPoint(x: screen.frame.midX, y: screen.frame.height / 2)
+        XCTAssertTrue(notice.dragBlocked(isActivated: true, at: cgPoint))
+
+        let panel = try XCTUnwrap(notice.panel)
+        XCTAssertTrue(screen.visibleFrame.contains(panel.frame))
+        XCTAssertTrue(panel.ignoresMouseEvents)
+
+        let view = try XCTUnwrap(panel.contentView)
+        let rep = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: rep)
+        let png = try XCTUnwrap(rep.representation(using: .png, properties: [:]))
+        try png.write(to: URL(fileURLWithPath: dir).appendingPathComponent("trial-expired-notice.png"))
+
+        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+        XCTAssertNil(notice.panel, "the banner dismisses itself")
+    }
+
     func testTrialReminderMilestones() {
         XCTAssertNil(TrialReminder.moment(for: .licensed))
         XCTAssertNil(TrialReminder.moment(for: .trial(daysRemaining: 10)))
