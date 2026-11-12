@@ -155,4 +155,73 @@ final class ZoneEditorTests: XCTestCase {
             try rep.representation(using: .png, properties: [:])!.write(to: url)
         }
     }
+
+    /// Opens the real overlay window on the main screen and drives it with
+    /// real events. Runs when ZONES_EDITOR_LIVE is set, since it briefly
+    /// covers the screen.
+    func testLiveWindowOnARealScreen() throws {
+        guard ProcessInfo.processInfo.environment["ZONES_EDITOR_LIVE"] != nil else {
+            throw XCTSkip("set ZONES_EDITOR_LIVE to open the editor on screen")
+        }
+        let screen = try XCTUnwrap(NSScreen.main)
+        let identity = DisplayIdentity.forScreen(screen)
+        let editor = ZoneEditor(store: store, settings: settings)
+        editors.append(editor)
+        editor.present(on: screen)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+
+        let window = try XCTUnwrap(editor.window)
+        let canvas = try XCTUnwrap(editor.canvas)
+        XCTAssertEqual(window.frame, screen.visibleFrame, "covers the work area, not the menu bar or Dock")
+        XCTAssertTrue(window.isVisible)
+        XCTAssertTrue(window.firstResponder === canvas, "keys must reach the canvas")
+        XCTAssertGreaterThan(canvas.toolbar.frame.width, 300)
+        XCTAssertEqual(canvas.toolbar.frame.midX, canvas.bounds.midX, accuracy: 1)
+        XCTAssertEqual(canvas.toolbar.frame.maxY, canvas.bounds.maxY - 12, accuracy: 1)
+
+        func mouse(_ type: NSEvent.EventType, _ p: CGPoint, flags: NSEvent.ModifierFlags = []) throws -> NSEvent {
+            try XCTUnwrap(NSEvent.mouseEvent(with: type, location: p, modifierFlags: flags,
+                                             timestamp: ProcessInfo.processInfo.systemUptime,
+                                             windowNumber: window.windowNumber, context: nil,
+                                             eventNumber: 0, clickCount: 1, pressure: 1))
+        }
+        let size = canvas.bounds.size
+        // Click in the middle splits; dragging places the divider at 30%.
+        window.sendEvent(try mouse(.leftMouseDown, CGPoint(x: size.width * 0.5, y: size.height * 0.5)))
+        window.sendEvent(try mouse(.leftMouseDragged, CGPoint(x: size.width * 0.3, y: size.height * 0.5)))
+        window.sendEvent(try mouse(.leftMouseUp, CGPoint(x: size.width * 0.3, y: size.height * 0.5)))
+        XCTAssertEqual(canvas.tree.zoneRects().first?.width ?? 0, 0.3, accuracy: 0.005)
+        // Shift-click the right zone splits it top/bottom.
+        window.sendEvent(try mouse(.leftMouseDown, CGPoint(x: size.width * 0.7, y: size.height * 0.5), flags: .shift))
+        window.sendEvent(try mouse(.leftMouseUp, CGPoint(x: size.width * 0.7, y: size.height * 0.5)))
+        XCTAssertEqual(canvas.tree.leafCount, 3)
+        // Right-click the bottom-right zone merges it away.
+        window.sendEvent(try mouse(.rightMouseDown, CGPoint(x: size.width * 0.7, y: size.height * 0.2)))
+        XCTAssertEqual(canvas.tree.leafCount, 2)
+        // The toolbar's Quarters button is what a click there hits, and it
+        // loads the preset. performClick, because a synthesized mouse-down
+        // on an NSButton waits for a real mouse-up.
+        let quarters = try XCTUnwrap(canvas.toolbar.subviews.first?.subviews
+            .compactMap { $0 as? ToolbarButton }.first { $0.attributedTitle.string == "3: Quarters" })
+        let inCanvas = quarters.convert(CGPoint(x: quarters.bounds.midX, y: quarters.bounds.midY), to: canvas)
+        XCTAssertTrue(canvas.hitTest(inCanvas) === quarters, "toolbar clicks must not reach the canvas")
+        quarters.performClick(nil)
+        XCTAssertEqual(canvas.tree, SplitTree(preset: .quarters))
+
+        if let dir = ProcessInfo.processInfo.environment["ZONES_EDITOR_SNAPSHOT_DIR"],
+           let rep = canvas.bitmapImageRepForCachingDisplay(in: canvas.bounds) {
+            canvas.cacheDisplay(in: canvas.bounds, to: rep)
+            try rep.representation(using: .png, properties: [:])?
+                .write(to: URL(fileURLWithPath: dir).appendingPathComponent("editor-live.png"))
+        }
+
+        let key = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                                                 timestamp: ProcessInfo.processInfo.systemUptime,
+                                                 windowNumber: window.windowNumber, context: nil,
+                                                 characters: "\r", charactersIgnoringModifiers: "\r",
+                                                 isARepeat: false, keyCode: 36))
+        window.sendEvent(key)
+        XCTAssertNil(editor.window, "Return applies and closes")
+        XCTAssertEqual(store.assignedLayout(for: identity)?.zones.count, 4)
+    }
 }
