@@ -1,0 +1,14 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Zones</title>
+        <item>
+            <title>0.1.0</title>
+            <pubDate>Wed, 11 Nov 2026 22:02:04 -0600</pubDate>
+            <sparkle:version>32</sparkle:version>
+            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://zones.pinyridgelabs.com/Zones-0.1.0.dmg" length="1972990" type="application/octet-stream" sparkle:edSignature="qgbZ5/HaRXRrZP7I0je8BTvrpx9IIxVMUdW2F7j7SNNKhBnP2NFhpsF21kzWM3DTEoUeAHCp1nRuN74kJGQbBg=="/>
+        </item>
+    </channel>
+</rss>
