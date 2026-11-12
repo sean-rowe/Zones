@@ -124,15 +124,79 @@ public final class ZonesController {
 
     // MARK: - Status item
 
+    /// The ⊞ menu bar icon.
+    ///
+    /// As on PineOS, clicking it opens the zone editor; the menu (status,
+    /// updates, About, Quit) is on a right-click or Control-click, the way the
+    /// FancyZones tray icon on Windows keeps its menu on the secondary click.
+    /// The menu is attached only for that one click — a status item with a
+    /// permanent `menu` never sends its button action at all.
     private func installStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = NSImage(
-            systemSymbolName: "rectangle.split.3x1",
-            accessibilityDescription: "Zones"
-        )
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let button = item.button {
+            let image = NSImage(systemSymbolName: "square.grid.2x2",
+                                accessibilityDescription: "Zones")
+            image?.isTemplate = true
+            button.image = image
+            button.toolTip = "Zones — click to edit zones, right-click for the menu"
+            button.target = self
+            button.action = #selector(statusItemClicked(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        }
+        item.autosaveName = "ZonesStatusItem"
+        item.isVisible = true
+        rebuildMenu()
+        statusItem = item
+        logStatusItemPlacement()
+    }
+
+    /// Records where the icon landed — the first thing to check when the icon
+    /// "isn't there". Occlusion is deliberately not logged: with several
+    /// displays the window AppKit hands back can be the copy on a display
+    /// whose menu bar is hidden, which reads as invisible while the icon is
+    /// showing on the active display.
+    private func logStatusItemPlacement() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            guard let window = self?.statusItem?.button?.window else {
+                ZonesLog.error("Zones", "status item has no window")
+                return
+            }
+            ZonesLog.info("Zones", "status item at \(NSStringFromRect(window.frame))")
+        }
+    }
+
+    /// Which click on the icon shows the menu rather than the editor.
+    static func statusClickOpensMenu(type: NSEvent.EventType?,
+                                     modifiers: NSEvent.ModifierFlags) -> Bool {
+        type == .rightMouseUp || type == .rightMouseDown || modifiers.contains(.control)
+    }
+
+    @objc private func statusItemClicked(_ sender: Any?) {
+        let event = NSApp.currentEvent
+        handleStatusClick(type: event?.type, modifiers: event?.modifierFlags ?? [])
+    }
+
+    /// Routes one click on the icon. Split from the `@objc` action so tests can
+    /// drive it without a real mouse event.
+    func handleStatusClick(type: NSEvent.EventType?, modifiers: NSEvent.ModifierFlags) {
+        if Self.statusClickOpensMenu(type: type, modifiers: modifiers) {
+            (showMenuOverride ?? showStatusMenu)()
+        } else {
+            (openEditorOverride ?? openEditor)()
+        }
+    }
+
+    /// Test seams: stand in for the editor and the menu, which would otherwise
+    /// open real windows.
+    var openEditorOverride: (() -> Void)?
+    var showMenuOverride: (() -> Void)?
+
+    private func showStatusMenu() {
+        guard let item = statusItem, let button = item.button else { return }
         rebuildMenu()
         item.menu = statusMenu
-        statusItem = item
+        button.performClick(nil)
+        item.menu = nil
     }
 
     public func rebuildMenu() {
@@ -158,8 +222,11 @@ public final class ZonesController {
         }
 
         menu.addItem(.separator())
+        // Shows the global shortcut; a status menu has no key window, so the
+        // equivalent is a label here and HotKeyManager does the work.
         let edit = NSMenuItem(title: "Edit Layout…", action: #selector(openEditor),
-                              keyEquivalent: "e")
+                              keyEquivalent: "`")
+        edit.keyEquivalentModifierMask = [.control, .option, .command]
         edit.target = self
         menu.addItem(edit)
         menu.addItem(NSMenuItem(title: "Settings…", action: nil, keyEquivalent: ","))
@@ -247,6 +314,9 @@ public final class ZonesController {
 
         hotKeyManager.layoutProvider = { [weak self] identity in
             self?.layouts.assignedLayout(for: identity)
+        }
+        hotKeyManager.onOpenEditor = { [weak self] in
+            self?.openEditor()
         }
         hotKeyManager.start()
 

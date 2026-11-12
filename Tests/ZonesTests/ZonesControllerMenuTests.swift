@@ -68,3 +68,50 @@ final class ZonesControllerMenuTests: XCTestCase {
         XCTAssertFalse(menu.items[0].isEnabled, "the status line is a label, not an action")
     }
 }
+
+extension ZonesControllerMenuTests {
+    func testAPlainClickOnTheIconOpensTheEditor() {
+        XCTAssertFalse(ZonesController.statusClickOpensMenu(type: .leftMouseUp, modifiers: []))
+    }
+
+    func testARightOrControlClickOnTheIconShowsTheMenu() {
+        XCTAssertTrue(ZonesController.statusClickOpensMenu(type: .rightMouseUp, modifiers: []))
+        XCTAssertTrue(ZonesController.statusClickOpensMenu(type: .leftMouseUp, modifiers: [.control]))
+    }
+
+    func testTheEditorItemShowsTheGlobalShortcut() {
+        let menu = controller(trusted: true).menuForTesting()
+        let item = menu.items.first { $0.title.hasPrefix("Edit Layout") }
+        XCTAssertEqual(item?.keyEquivalent, "`")
+        XCTAssertEqual(item?.keyEquivalentModifierMask, [.control, .option, .command])
+    }
+}
+
+extension ZonesControllerMenuTests {
+    private func clicks(type: NSEvent.EventType?, modifiers: NSEvent.ModifierFlags) -> (editor: Int, menu: Int) {
+        let zones = controller(trusted: true)
+        var editor = 0, menu = 0
+        zones.openEditorOverride = { editor += 1 }
+        zones.showMenuOverride = { menu += 1 }
+        zones.handleStatusClick(type: type, modifiers: modifiers)
+        return (editor, menu)
+    }
+
+    func testAPlainClickRoutesToTheEditor() {
+        let result = clicks(type: .leftMouseUp, modifiers: [])
+        XCTAssertEqual(result.editor, 1)
+        XCTAssertEqual(result.menu, 0)
+    }
+
+    func testARightClickRoutesToTheMenu() {
+        let result = clicks(type: .rightMouseUp, modifiers: [])
+        XCTAssertEqual(result.editor, 0)
+        XCTAssertEqual(result.menu, 1)
+    }
+
+    func testAControlClickRoutesToTheMenu() {
+        let result = clicks(type: .leftMouseUp, modifiers: [.control])
+        XCTAssertEqual(result.editor, 0)
+        XCTAssertEqual(result.menu, 1)
+    }
+}

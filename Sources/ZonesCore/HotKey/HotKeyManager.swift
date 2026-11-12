@@ -7,6 +7,7 @@ import Foundation
 /// - Move focused window to zone N (⌃⌥⌘1–9)
 /// - Cycle to next / previous zone (⌃⌥⌘→ / ⌃⌥⌘←)
 /// - Move to matching zone on next display (⌃⌥⌘↑ / ⌃⌥⌘↓)
+/// - Open the zone editor (⌃⌥⌘`)
 public class HotKeyManager {
     public var snapper: WindowSnapper = WindowSnapper()
 
@@ -24,6 +25,17 @@ public class HotKeyManager {
     public var windowFrameProvider: (AXUIElement) -> CGRect? = { AccessibilityElement($0).frame }
     public var isFullScreenProvider: (AXUIElement) -> Bool = { AccessibilityElement($0).isFullScreen }
     public var layoutProvider: ((DisplayIdentity) -> ZoneLayout?)?
+
+    /// Opens the zone editor (⌃⌥⌘`).
+    ///
+    /// PineOS opens its editor on Super+` and Windows on Win+Shift+`. On a Mac
+    /// both of those belong to the system — ⌘` and ⌘⇧` cycle an app's windows,
+    /// and ⌥` is the grave-accent dead key — so the grave key joins the rest of
+    /// Zones' ⌃⌥⌘ family instead. Nil leaves the key to the frontmost app.
+    public var onOpenEditor: (() -> Void)?
+
+    /// kVK_ANSI_Grave.
+    static let graveKeyCode: UInt16 = 50
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -110,6 +122,13 @@ public class HotKeyManager {
 
         if let zoneIndex = numberKeys[event.keyCode] {
             return snapFocusedWindow(toZoneIndex: zoneIndex)
+        }
+
+        // Grave (`): open the zone editor, as Super+` does on PineOS.
+        if event.keyCode == Self.graveKeyCode {
+            guard let onOpenEditor else { return false }
+            onOpenEditor()
+            return true
         }
 
         // Left arrow (123) / Right arrow (124)
