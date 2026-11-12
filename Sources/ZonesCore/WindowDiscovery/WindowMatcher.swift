@@ -33,6 +33,12 @@ private func windowID(of element: AXUIElement) -> CGWindowID? {
 public class WindowMatcher {
     public init() {}
 
+    /// The window-server ID behind an AX window, when the private lookup is
+    /// available and the application answers.
+    public func cgWindowID(for element: AXUIElement) -> CGWindowID? {
+        windowID(of: element)
+    }
+
     /// Whether the private window-ID lookup resolved on this system.
     public static var resolvesWindowIDsDirectly: Bool { axUIElementGetWindow != nil }
 

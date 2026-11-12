@@ -20,7 +20,18 @@ public class WindowSnapper {
     public var windowMatcher: WindowMatcher = WindowMatcher()
     public var onSnapFrame: ((CGRect) -> Void)?
 
-    public init() {}
+    /// Seam: the height of a Tack tab strip on top of this window, if the
+    /// window is the active tab of a Tack group. See `TackTabStrip`.
+    public var tabStripHeight: (AXUIElement) -> CGFloat?
+
+    public init() {
+        let matcher = WindowMatcher()
+        let detector = TackTabStripDetector()
+        tabStripHeight = { element in
+            guard let id = matcher.cgWindowID(for: element) else { return nil }
+            return detector.stripHeight(forWindowID: id)
+        }
+    }
 
     /// Snaps a window identified by WindowInfo to a target frame in CoreGraphics screen coordinates.
     @discardableResult
@@ -34,7 +45,15 @@ public class WindowSnapper {
 
     /// Snaps an AXUIElement to a target frame in CoreGraphics screen coordinates.
     @discardableResult
-    public func snap(element: AXUIElement, to targetCGFrame: CGRect) -> SnapResult {
+    public func snap(element: AXUIElement, to zoneCGFrame: CGRect) -> SnapResult {
+        // A window wearing a Tack tab strip gets the zone minus the strip, so
+        // strip and window together fill the zone. Snapped to the whole zone,
+        // Tack pushes the window down to make room and it overhangs the zone.
+        var targetCGFrame = zoneCGFrame
+        if let strip = tabStripHeight(element) {
+            targetCGFrame = TackTabStrip.frame(zoneCGFrame, leavingRoomFor: strip)
+            ZonesLog.info("Snap", "Tack tab strip \(Int(strip))pt above window; target \(zoneCGFrame) → \(targetCGFrame)")
+        }
         onSnapFrame?(targetCGFrame)
         let ax = AccessibilityElement(element)
 
