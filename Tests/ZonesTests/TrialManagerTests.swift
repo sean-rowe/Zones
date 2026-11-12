@@ -83,6 +83,21 @@ final class TrialManagerTests: XCTestCase {
         XCTAssertNil(manager.menuLine)
     }
 
+    func testDevelopmentBuildIsNeverBlockedByAnExpiredTrial() {
+        _ = manager.state // establish anchor
+        simulatedDate = Calendar.current.date(byAdding: .day, value: 44, to: simulatedDate)!
+        XCTAssertFalse(manager.canSnap)
+
+        manager.isDevelopmentBuild = { true }
+        XCTAssertEqual(manager.state, .licensed)
+        XCTAssertTrue(manager.canSnap)
+        XCTAssertNil(manager.menuLine)
+    }
+
+    func testTestsRunWithTheTrialClockEnforced() {
+        XCTAssertFalse(TrialManager().isDevelopmentBuild())
+    }
+
     func testTrialReminderMilestones() {
         XCTAssertNil(TrialReminder.moment(for: .licensed))
         XCTAssertNil(TrialReminder.moment(for: .trial(daysRemaining: 10)))

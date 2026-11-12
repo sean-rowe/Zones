@@ -323,6 +323,10 @@ public final class ZonesController {
         windowRestorer.start()
 
         ZonesLog.info("Zones", "accessibility granted; window management active")
+        if !trialManager.canSnap {
+            // Otherwise the only symptom is drags that do nothing.
+            ZonesLog.info("Zones", "trial expired and no license; drag snapping is off")
+        }
     }
 
     private func setupDragHandling() {
