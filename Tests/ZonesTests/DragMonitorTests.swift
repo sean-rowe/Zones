@@ -263,4 +263,46 @@ extension DragMonitorTests {
     func testCandidateDragRechecksWhenTheFirstLookupWasInconclusive() {
         XCTAssertEqual(dragCandidateWindow(fullScreen: nil), 2)
     }
+
+    // MARK: - A release that never arrives
+
+    func testAPressWhileADragIsOpenEndsThatDrag() {
+        var cancels = 0
+        monitor.onDragCancelled = { cancels += 1 }
+
+        monitor.handleMouseDown(at: CGPoint(x: 200, y: 120))
+        monitor.handleMouseDragged(at: CGPoint(x: 220, y: 140), flags: [.maskShift])
+        // The release was lost; the next thing seen is another press.
+        monitor.handleMouseDown(at: CGPoint(x: 600, y: 500))
+
+        XCTAssertEqual(cancels, 1, "the open drag must be ended so its overlay is hidden")
+    }
+
+    func testLostEventsEndTheOpenDragAndItsLateReleaseIsIgnored() {
+        var cancels = 0
+        var ended = false
+        monitor.onDragCancelled = { cancels += 1 }
+        monitor.onDragEnded = { _, _, _, _ in ended = true }
+
+        monitor.handleMouseDown(at: CGPoint(x: 200, y: 120))
+        monitor.handleMouseDragged(at: CGPoint(x: 220, y: 140), flags: [.maskShift])
+        monitor.abandonDragAfterLostEvents()
+        monitor.handleMouseUp(at: CGPoint(x: 220, y: 140), flags: [.maskShift])
+
+        XCTAssertEqual(cancels, 1)
+        XCTAssertFalse(ended, "a drag already given up on must not snap on a late release")
+    }
+
+    func testAPressAfterAFinishedDragCancelsNothing() {
+        var cancels = 0
+        monitor.onDragCancelled = { cancels += 1 }
+
+        monitor.handleMouseDown(at: CGPoint(x: 200, y: 120))
+        monitor.handleMouseDragged(at: CGPoint(x: 220, y: 140), flags: [.maskShift])
+        monitor.handleMouseUp(at: CGPoint(x: 220, y: 140), flags: [.maskShift])
+        monitor.handleMouseDown(at: CGPoint(x: 200, y: 120))
+        monitor.abandonDragAfterLostEvents()
+
+        XCTAssertEqual(cancels, 0)
+    }
 }

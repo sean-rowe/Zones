@@ -93,6 +93,9 @@ public class DragMonitor {
                     if let tap = monitor.eventTap {
                         CGEvent.tapEnable(tap: tap, enable: true)
                     }
+                    // Whatever happened while the tap was off is gone, the
+                    // button's release included.
+                    monitor.abandonDragAfterLostEvents()
                     return Unmanaged.passUnretained(event)
                 }
 
@@ -153,6 +156,8 @@ public class DragMonitor {
     // MARK: - Handlers
 
     public func handleMouseDown(at location: CGPoint) {
+        // A press while a drag is still open means its release never arrived.
+        abandonDragAfterLostEvents()
         resetDrag()
         dragStartPos = location
         windowSnapshot = windowProvider.listWindows()
@@ -233,6 +238,19 @@ public class DragMonitor {
         let active = isZoneActive(flags: flags)
         let span = isSpanModifierHeld(flags: flags)
         onDragMoved?(cursorProvider.currentMouseLocation(), window, active, span)
+    }
+
+    /// End a drag whose release was never seen.
+    ///
+    /// The overlay is shown when a drag starts and hidden only when the drag
+    /// ends or is cancelled. A release lost while the tap was switched off left
+    /// it on screen for good: the next press quietly reset the drag, after which
+    /// Escape no longer applied either, and nothing could take it down.
+    public func abandonDragAfterLostEvents() {
+        guard isDragging, !isCancelled else { return }
+        isCancelled = true
+        ZonesLog.info("Drag", "Drag ended without its release; dismissing the overlay")
+        onDragCancelled?()
     }
 
     public func handleEscapeKey() {
