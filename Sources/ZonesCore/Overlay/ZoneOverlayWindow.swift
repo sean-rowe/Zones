@@ -24,6 +24,9 @@ public class ZoneOverlayWindow: NSPanel {
         self.hasShadow = false
         self.ignoresMouseEvents = true
         self.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        // Hidden overlays are closed, not just ordered out; under ARC a window
+        // that releases itself on close is released twice.
+        self.isReleasedWhenClosed = false
 
         self.contentView = overlayView
     }

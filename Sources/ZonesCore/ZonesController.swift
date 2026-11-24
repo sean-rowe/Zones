@@ -410,6 +410,14 @@ public final class ZonesController {
         dragMonitor.onDragCancelled = { [weak self] in
             self?.overlayManager.hide()
         }
+
+        // No drag is under way at a press, so no overlay should be up unless a
+        // flash is showing. Clearing it here means a stuck overlay goes at the
+        // next click, whatever left it there.
+        dragMonitor.onPress = { [weak self] in
+            guard let self, !self.overlayManager.isFlashing else { return }
+            self.overlayManager.hide()
+        }
     }
 
     private func currentAssignedLayouts() -> [DisplayIdentity: ZoneLayout] {
