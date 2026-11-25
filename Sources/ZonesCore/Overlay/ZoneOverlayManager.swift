@@ -10,6 +10,13 @@ public class ZoneOverlayManager {
 
     public var screensProvider: () -> [NSScreen] = { NSScreen.screens }
 
+    /// Every window the app has. A seam, so the sweep for stray overlays can be
+    /// tested against windows of the test's choosing.
+    public var appWindowsProvider: () -> [NSWindow] = { NSApp?.windows ?? [] }
+
+    /// Whether a timed flash is on screen, which a click should not cut short.
+    public var isFlashing: Bool { flashTimer != nil }
+
     private var accumulatedSpanIndices: Set<Int> = []
     private var flashTimer: Timer?
 
@@ -18,6 +25,7 @@ public class ZoneOverlayManager {
     /// Shows zone overlays on all displays for the given active layouts.
     public func show(layouts: [DisplayIdentity: ZoneLayout]) {
         hide()
+        ZonesLog.info("Overlay", "show on \(layouts.count) display(s)")
         activeLayouts = layouts
         accumulatedSpanIndices = []
         lastHitResult = nil
@@ -117,12 +125,39 @@ public class ZoneOverlayManager {
     public func hide() {
         flashTimer?.invalidate()
         flashTimer = nil
+        if !overlayWindows.isEmpty {
+            ZonesLog.info("Overlay", "hide \(overlayWindows.count) window(s)")
+        }
         for window in overlayWindows {
             window.orderOut(nil)
+            window.close()
         }
         overlayWindows.removeAll()
         accumulatedSpanIndices = []
         lastHitResult = nil
+        dismissStrays()
+    }
+
+    /// Closes overlay windows that are still on screen but no longer held here.
+    ///
+    /// The overlay was found on both displays several times over, four
+    /// windows deep, long after every show had been matched by a hide. However
+    /// they outlived their manager, a window nothing tracks can never be taken
+    /// down by it, so every hide also looks for them.
+    @discardableResult
+    public func dismissStrays() -> Int {
+        let held = Set(overlayWindows.map { ObjectIdentifier($0) })
+        let strays = appWindowsProvider().filter {
+            $0 is ZoneOverlayWindow && $0.isVisible && !held.contains(ObjectIdentifier($0))
+        }
+        for window in strays {
+            window.orderOut(nil)
+            window.close()
+        }
+        if !strays.isEmpty {
+            ZonesLog.error("Overlay", "closed \(strays.count) overlay window(s) left on screen")
+        }
+        return strays.count
     }
 
     private func applyHighlight(screen: NSScreen, highlightedIndices: Set<Int>) {

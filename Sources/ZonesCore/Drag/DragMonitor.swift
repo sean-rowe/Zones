@@ -66,6 +66,9 @@ public class DragMonitor {
     public var onDragMoved: ((CGPoint, WindowInfo, _ isActivated: Bool, _ isSpanHeld: Bool) -> Void)?
     public var onDragEnded: ((WindowInfo, CGPoint, _ shouldSnap: Bool, _ isSpanHeld: Bool) -> Void)?
     public var onDragCancelled: (() -> Void)?
+    /// Any left-button press, before it is judged as the start of a drag. The
+    /// overlay belongs to a drag, so a press is a safe moment to clear it.
+    public var onPress: (() -> Void)?
 
     public init() {}
 
@@ -158,6 +161,7 @@ public class DragMonitor {
     public func handleMouseDown(at location: CGPoint) {
         // A press while a drag is still open means its release never arrived.
         abandonDragAfterLostEvents()
+        onPress?()
         resetDrag()
         dragStartPos = location
         windowSnapshot = windowProvider.listWindows()
